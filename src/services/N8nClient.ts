@@ -251,16 +251,23 @@ export class N8nClient {
     rows?: Array<Record<string, unknown>>;
   }): Promise<N8nDataTable> {
     try {
+      logger.debug(
+        `[N8N_CLIENT] create data table name="${payload.name}" columns=${payload.columns.length} rows=${payload.rows?.length ?? 0}`,
+      );
       const response = await this.api.post(`/api/v1/data-tables`, {
         name: payload.name,
         columns: payload.columns,
       });
       const table = N8nDataTableSchema.parse(response.data);
       if (payload.rows && payload.rows.length > 0) {
-        await this.api.post(`/api/v1/data-tables/${table.id}/rows/batch`, { rows: payload.rows });
+        const sanitizedRows = this.sanitizeDataTableRows(payload.rows, payload.columns);
+        await this.insertDataTableRows(table.id, sanitizedRows);
       }
       return table;
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       throw normalizeAxiosError(error, { entity: "data-table", op: "create" });
     }
   }
@@ -502,5 +509,68 @@ export class N8nClient {
       }
     }
     return [...fields];
+  }
+
+  private sanitizeDataTableRows(
+    rows: Array<Record<string, unknown>>,
+    columns: Array<Record<string, unknown>>,
+  ): Array<Record<string, unknown>> {
+    const columnNames = columns
+      .map((column) => column.name)
+      .filter((name): name is string => typeof name === "string");
+
+    if (columnNames.length === 0) {
+      return rows;
+    }
+
+    return rows.map((row) => {
+      const cleanRow: Record<string, unknown> = {};
+      for (const key of columnNames) {
+        if (Object.prototype.hasOwnProperty.call(row, key)) {
+          cleanRow[key] = row[key];
+        }
+      }
+      return cleanRow;
+    });
+  }
+
+  private async insertDataTableRows(
+    dataTableId: string,
+    rows: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    try {
+      logger.debug(
+        `[N8N_CLIENT] insert data table rows endpoint=/rows table_id=${dataTableId} count=${rows.length}`,
+      );
+      await this.api.post(`/api/v1/data-tables/${dataTableId}/rows`, {
+        data: rows,
+        returnType: "count",
+      });
+      return;
+    } catch (error) {
+      const firstError = normalizeAxiosError(error, {
+        entity: "data-table-rows",
+        op: "insert",
+        strategy: "rows",
+        dataTableId,
+      });
+      if (firstError.status !== 404 && firstError.status !== 405) {
+        throw firstError;
+      }
+      logger.warn(
+        `[N8N_CLIENT] rows insert fallback endpoint=/rows/batch table_id=${dataTableId} status=${firstError.status}`,
+      );
+    }
+
+    try {
+      await this.api.post(`/api/v1/data-tables/${dataTableId}/rows/batch`, { rows });
+    } catch (error) {
+      throw normalizeAxiosError(error, {
+        entity: "data-table-rows",
+        op: "insert",
+        strategy: "rows-batch",
+        dataTableId,
+      });
+    }
   }
 }

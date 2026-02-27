@@ -231,27 +231,45 @@ export class PlanService {
     for (const node of workflow.nodes) {
       if (node.credentials) {
         for (const credential of Object.values(node.credentials)) {
-          if (!credential?.id) {
+          const credentialId = this.extractReferenceId(credential?.id);
+          if (!credentialId) {
+            logger.warn(
+              `[PLAN][01] Node \"${node.name}\" has credential without resolvable id`,
+            );
             continue;
           }
-          dependencies.credentialIds.add(credential.id);
-          credentialIds.add(credential.id);
+          dependencies.credentialIds.add(credentialId);
+          credentialIds.add(credentialId);
         }
       }
 
       const workflowParam = node.parameters?.workflowId;
-      if (node.type === "n8n-nodes-base.executeWorkflow" && typeof workflowParam === "string") {
-        dependencies.subWorkflowIds.add(workflowParam);
-        logger.debug(
-          `[PLAN][01] Node \"${node.name}\" discovered sub-workflow dependency=${workflowParam}`,
-        );
+      if (node.type === "n8n-nodes-base.executeWorkflow") {
+        const workflowParamId = this.extractReferenceId(workflowParam);
+        if (workflowParamId) {
+          dependencies.subWorkflowIds.add(workflowParamId);
+          logger.debug(
+            `[PLAN][01] Node \"${node.name}\" discovered sub-workflow dependency=${workflowParamId}`,
+          );
+        } else {
+          logger.warn(
+            `[PLAN][01] Node \"${node.name}\" executeWorkflow has no resolvable workflowId`,
+          );
+        }
       }
 
       const tableParam = node.parameters?.tableId;
-      if (node.type === "n8n-nodes-base.dataTable" && typeof tableParam === "string") {
-        dependencies.dataTableIds.add(tableParam);
-        dataTableIds.add(tableParam);
-        logger.debug(`[PLAN][01] Node \"${node.name}\" discovered data-table dependency=${tableParam}`);
+      if (node.type === "n8n-nodes-base.dataTable") {
+        const tableParamId = this.extractReferenceId(tableParam);
+        if (tableParamId) {
+          dependencies.dataTableIds.add(tableParamId);
+          dataTableIds.add(tableParamId);
+          logger.debug(
+            `[PLAN][01] Node \"${node.name}\" discovered data-table dependency=${tableParamId}`,
+          );
+        } else {
+          logger.warn(`[PLAN][01] Node \"${node.name}\" dataTable has no resolvable tableId`);
+        }
       }
     }
 
@@ -330,5 +348,28 @@ export class PlanService {
     }
     const fallback = error as Error;
     logger.error(`[PLAN][${step}] Error: ${fallback.message}`);
+  }
+
+  private extractReferenceId(reference: unknown): string | null {
+    if (typeof reference === "string" || typeof reference === "number") {
+      return String(reference);
+    }
+
+    if (!reference || typeof reference !== "object") {
+      return null;
+    }
+
+    const record = reference as Record<string, unknown>;
+    const directValue = record.value;
+    if (typeof directValue === "string" || typeof directValue === "number") {
+      return String(directValue);
+    }
+
+    const directId = record.id;
+    if (typeof directId === "string" || typeof directId === "number") {
+      return String(directId);
+    }
+
+    return null;
   }
 }

@@ -29,10 +29,8 @@ export class TransformService {
 
         if (
           (key === "workflowId" || key === "tableId") &&
-          typeof child === "string" &&
-          idMap[child]
+          this.patchReferenceField(result, key, child, idMap)
         ) {
-          result[key] = idMap[child];
           continue;
         }
 
@@ -43,5 +41,52 @@ export class TransformService {
     }
 
     return value;
+  }
+
+  private patchReferenceField(
+    target: Record<string, unknown>,
+    key: string,
+    value: unknown,
+    idMap: Record<string, string>,
+  ): boolean {
+    if (typeof value === "string" || typeof value === "number") {
+      const mapped = idMap[String(value)];
+      if (mapped) {
+        target[key] = mapped;
+        return true;
+      }
+      return false;
+    }
+
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+
+    const refObject = value as Record<string, unknown>;
+    const refValue = refObject.value;
+    if (typeof refValue === "string" || typeof refValue === "number") {
+      const mapped = idMap[String(refValue)];
+      if (mapped) {
+        target[key] = {
+          ...refObject,
+          value: mapped,
+        };
+        return true;
+      }
+    }
+
+    const refId = refObject.id;
+    if (typeof refId === "string" || typeof refId === "number") {
+      const mapped = idMap[String(refId)];
+      if (mapped) {
+        target[key] = {
+          ...refObject,
+          id: mapped,
+        };
+        return true;
+      }
+    }
+
+    return false;
   }
 }

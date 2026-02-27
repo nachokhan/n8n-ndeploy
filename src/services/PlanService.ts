@@ -142,29 +142,15 @@ export class PlanService {
             },
             dependencies: dependencyList,
           });
+          logger.debug(
+            `[PLAN][04] Workflow payload sanity name="${detail.workflow.name}" has_connections=${this.hasConnectionsObject(detail.workflow)}`,
+          );
         }
       });
 
       await this.runStep("05", "Sort execution graph and assign order", async () => {
-        // Order leaves -> root via dependency depth and root at the end.
-        actions.sort((a, b) => {
-          const typeWeight = (type: PlanActionItem["type"]): number => {
-            if (type === "CREDENTIAL") return 1;
-            if (type === "DATATABLE") return 2;
-            return 3;
-          };
-          const typeDiff = typeWeight(a.type) - typeWeight(b.type);
-          if (typeDiff !== 0) return typeDiff;
-
-          if (a.type === "WORKFLOW" && b.type === "WORKFLOW") {
-            if (a.dev_id === rootWorkflowId) return 1;
-            if (b.dev_id === rootWorkflowId) return -1;
-            const depDiff = a.dependencies.length - b.dependencies.length;
-            if (depDiff !== 0) return depDiff;
-          }
-
-          return a.name.localeCompare(b.name);
-        });
+        const sorted = this.topologicalSortActions(actions, rootWorkflowId);
+        actions.splice(0, actions.length, ...sorted);
 
         actions.forEach((action, index) => {
           action.order = index + 1;
@@ -247,6 +233,12 @@ export class PlanService {
       if (node.type === "n8n-nodes-base.executeWorkflow") {
         const workflowParamId = this.extractReferenceId(workflowParam);
         if (workflowParamId) {
+          if (workflowParamId === workflow.id) {
+            logger.warn(
+              `[PLAN][01] Node "${node.name}" has self-referencing sub-workflow dependency=${workflowParamId}; ignored for ordering`,
+            );
+            continue;
+          }
           dependencies.subWorkflowIds.add(workflowParamId);
           logger.debug(
             `[PLAN][01] Node \"${node.name}\" discovered sub-workflow dependency=${workflowParamId}`,
@@ -373,5 +365,117 @@ export class PlanService {
     }
 
     return null;
+  }
+
+  private hasConnectionsObject(workflow: N8nWorkflow): boolean {
+    const maybeConnections = (workflow as unknown as Record<string, unknown>).connections;
+    return !!maybeConnections && typeof maybeConnections === "object" && !Array.isArray(maybeConnections);
+  }
+
+  private topologicalSortActions(
+    actions: PlanActionItem[],
+    rootWorkflowId: string,
+  ): PlanActionItem[] {
+    const byDevId = new Map<string, PlanActionItem>();
+    for (const action of actions) {
+      byDevId.set(action.dev_id, action);
+    }
+
+    const indegree = new Map<string, number>();
+    const outgoing = new Map<string, string[]>();
+    for (const action of actions) {
+      indegree.set(action.dev_id, 0);
+      outgoing.set(action.dev_id, []);
+    }
+
+    for (const action of actions) {
+      for (const dependency of action.dependencies) {
+        if (dependency === action.dev_id) {
+          logger.warn(
+            `[PLAN][05] Ignoring self dependency dev_id=${action.dev_id}`,
+          );
+          continue;
+        }
+        if (!byDevId.has(dependency)) {
+          logger.warn(
+            `[PLAN][05] Ignoring external dependency not present in plan action list dev_id=${action.dev_id} dependency=${dependency}`,
+          );
+          continue;
+        }
+        indegree.set(action.dev_id, (indegree.get(action.dev_id) ?? 0) + 1);
+        outgoing.get(dependency)?.push(action.dev_id);
+      }
+    }
+
+    const queue: string[] = [];
+    for (const action of actions) {
+      if ((indegree.get(action.dev_id) ?? 0) === 0) {
+        queue.push(action.dev_id);
+      }
+    }
+
+    const sortQueue = (): void => {
+      queue.sort((a, b) => this.compareActionsForOrder(byDevId.get(a)!, byDevId.get(b)!, rootWorkflowId));
+    };
+    sortQueue();
+
+    const result: PlanActionItem[] = [];
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      if (!currentId) {
+        break;
+      }
+      const currentAction = byDevId.get(currentId);
+      if (!currentAction) {
+        continue;
+      }
+      result.push(currentAction);
+
+      for (const dependentId of outgoing.get(currentId) ?? []) {
+        const next = (indegree.get(dependentId) ?? 0) - 1;
+        indegree.set(dependentId, next);
+        if (next === 0) {
+          queue.push(dependentId);
+          sortQueue();
+        }
+      }
+    }
+
+    if (result.length !== actions.length) {
+      const placed = new Set(result.map((action) => action.dev_id));
+      const remaining = actions
+        .filter((action) => !placed.has(action.dev_id))
+        .sort((a, b) => this.compareActionsForOrder(a, b, rootWorkflowId));
+
+      logger.warn(
+        `[PLAN][05] Cycle detected in dependencies; applying deterministic fallback order for remaining actions=${remaining.length}`,
+      );
+      result.push(...remaining);
+    }
+
+    return result;
+  }
+
+  private compareActionsForOrder(
+    a: PlanActionItem,
+    b: PlanActionItem,
+    rootWorkflowId: string,
+  ): number {
+    const typeWeight = (type: PlanActionItem["type"]): number => {
+      if (type === "CREDENTIAL") return 1;
+      if (type === "DATATABLE") return 2;
+      return 3;
+    };
+    const typeDiff = typeWeight(a.type) - typeWeight(b.type);
+    if (typeDiff !== 0) {
+      return typeDiff;
+    }
+
+    if (a.type === "WORKFLOW" && b.type === "WORKFLOW") {
+      if (a.dev_id === rootWorkflowId) return 1;
+      if (b.dev_id === rootWorkflowId) return -1;
+    }
+
+    return a.name.localeCompare(b.name);
   }
 }

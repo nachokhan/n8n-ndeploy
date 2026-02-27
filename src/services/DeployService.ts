@@ -114,7 +114,7 @@ export class DeployService {
 
     const payload = action.payload as { name: string; type: string };
     logger.debug(
-      `[DEPLOY][RUN][CREDENTIAL] CREATE placeholder name="${payload.name}" type="${payload.type}"`,
+      `[DEPLOY][RUN][CREDENTIAL] CREATE placeholder name="${payload.name}" type="${payload.type}" data=auto-from-schema`,
     );
     const created = await this.prodClient.createCredentialPlaceholder({
       name: payload.name,

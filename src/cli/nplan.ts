@@ -8,7 +8,7 @@ import { resolvePlanFileName, writeJsonFile } from "../utils/file.js";
 import { ApiError, DependencyError, ValidationError } from "../errors/index.js";
 
 export function registerNPlanCommand(program: Command): void {
-  const nplan = new Command("nplan");
+  const nplan = new Command("plan");
 
   nplan
     .command("flow")

@@ -10,7 +10,7 @@ import { ApiError, ValidationError } from "../errors/index.js";
 
 export function registerNDeployCommand(program: Command): void {
   program
-    .command("ndeploy")
+    .command("apply")
     .argument("<plan_file_path>", "Path to plan JSON")
     .description("Execute deployment plan in PROD")
     .action(async (planFilePath: string) => {
@@ -64,5 +64,5 @@ export function registerNDeployCommand(program: Command): void {
       }
     });
 
-  logger.debug("Command ndeploy registered");
+  logger.debug("Command apply registered");
 }

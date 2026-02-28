@@ -7,7 +7,7 @@ import { ApiError } from "../errors/index.js";
 
 export function registerNPublishCommand(program: Command): void {
   program
-    .command("npublish")
+    .command("publish")
     .argument("<workflow_id_prod>", "Workflow ID in PROD to publish")
     .description("Manually publish a workflow in PROD")
     .action(async (workflowIdProd: string) => {

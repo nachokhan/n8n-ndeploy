@@ -43,6 +43,30 @@ export class DeployService {
         }
       });
 
+      await this.runStep(
+        "VAL",
+        "04",
+        "Validate workflow payloads include required fields for deploy",
+        async () => {
+          for (const action of parsed.data.actions) {
+            if (action.type !== "WORKFLOW") {
+              continue;
+            }
+            const payload = action.payload as { raw_json?: unknown };
+            if (!this.hasWorkflowDeployShape(payload.raw_json)) {
+              throw new ValidationError(
+                "Workflow payload is missing required fields (expected nodes + connections). Regenerate plan.",
+                {
+                  action_order: action.order,
+                  workflow_name: action.name,
+                  workflow_dev_id: action.dev_id,
+                },
+              );
+            }
+          }
+        },
+      );
+
       logger.success(
         `[DEPLOY][VAL][DONE] Plan valid plan_id=${parsed.data.metadata.plan_id} actions=${parsed.data.actions.length}`,
       );
@@ -58,7 +82,7 @@ export class DeployService {
       `[DEPLOY][RUN][00] Start deployment plan_id=${plan.metadata.plan_id} actions=${plan.actions.length}`,
     );
     const idMap: Record<string, string> = {};
-    const orderedActions = [...plan.actions].sort((a, b) => a.order - b.order);
+    const orderedActions = this.topologicalSortActions(plan.actions);
 
     for (const action of orderedActions) {
       const actionTag = `${action.order.toString().padStart(3, "0")}`;
@@ -74,7 +98,7 @@ export class DeployService {
 
       const startedAt = Date.now();
       try {
-        await this.executeAction(action, idMap);
+        await this.executeAction(action, idMap, plan.metadata.root_workflow_id);
         const elapsedMs = Date.now() - startedAt;
         const mappedId = idMap[action.dev_id] ?? "n/a";
         logger.success(
@@ -89,7 +113,11 @@ export class DeployService {
     logger.success(`[DEPLOY][RUN][DONE] Deployment completed, mapped_ids=${Object.keys(idMap).length}`);
   }
 
-  private async executeAction(action: PlanActionItem, idMap: Record<string, string>): Promise<void> {
+  private async executeAction(
+    action: PlanActionItem,
+    idMap: Record<string, string>,
+    rootWorkflowDevId: string,
+  ): Promise<void> {
     if (action.type === "CREDENTIAL") {
       await this.executeCredential(action, idMap);
       return;
@@ -100,7 +128,7 @@ export class DeployService {
       return;
     }
 
-    await this.executeWorkflow(action, idMap);
+    await this.executeWorkflow(action, idMap, rootWorkflowDevId);
   }
 
   private async executeCredential(action: PlanActionItem, idMap: Record<string, string>): Promise<void> {
@@ -150,7 +178,11 @@ export class DeployService {
     );
   }
 
-  private async executeWorkflow(action: PlanActionItem, idMap: Record<string, string>): Promise<void> {
+  private async executeWorkflow(
+    action: PlanActionItem,
+    idMap: Record<string, string>,
+    rootWorkflowDevId: string,
+  ): Promise<void> {
     const payload = action.payload as {
       raw_json: unknown;
     };
@@ -173,6 +205,15 @@ export class DeployService {
           name: action.name,
         });
       }
+      if (action.dev_id === rootWorkflowDevId) {
+        const currentRoot = await this.prodClient.getWorkflowById(targetId);
+        if (this.isWorkflowActive(currentRoot)) {
+          logger.info(
+            `[DEPLOY][RUN][WORKFLOW] Root workflow is active, deactivating before update id=${targetId}`,
+          );
+          await this.prodClient.deactivateWorkflow(targetId);
+        }
+      }
       logger.debug(
         `[DEPLOY][RUN][WORKFLOW] UPDATE name="${action.name}" target_prod_id=${targetId}`,
       );
@@ -181,6 +222,7 @@ export class DeployService {
       logger.debug(
         `[DEPLOY][RUN][WORKFLOW] UPDATED name="${action.name}" dev_id=${action.dev_id} prod_id=${updated.id}`,
       );
+      await this.postWorkflowWrite(updated.id, action, rootWorkflowDevId);
       return;
     }
 
@@ -190,6 +232,7 @@ export class DeployService {
     logger.debug(
       `[DEPLOY][RUN][WORKFLOW] CREATED name="${action.name}" dev_id=${action.dev_id} prod_id=${created.id}`,
     );
+    await this.postWorkflowWrite(created.id, action, rootWorkflowDevId);
   }
 
   private async runStep(
@@ -249,5 +292,141 @@ export class DeployService {
     }
     const fallback = error as Error;
     logger.error(`[DEPLOY][${phase}][${step}] Error: ${fallback.message}`);
+  }
+
+  private hasWorkflowDeployShape(rawWorkflow: unknown): boolean {
+    if (!rawWorkflow || typeof rawWorkflow !== "object" || Array.isArray(rawWorkflow)) {
+      return false;
+    }
+    const candidate = rawWorkflow as Record<string, unknown>;
+    const hasNodes = Array.isArray(candidate.nodes);
+    const connections = candidate.connections;
+    const hasConnections =
+      !!connections && typeof connections === "object" && !Array.isArray(connections);
+    return hasNodes && hasConnections;
+  }
+
+  private topologicalSortActions(actions: PlanActionItem[]): PlanActionItem[] {
+    const byDevId = new Map<string, PlanActionItem>();
+    for (const action of actions) {
+      byDevId.set(action.dev_id, action);
+    }
+
+    const indegree = new Map<string, number>();
+    const outgoing = new Map<string, string[]>();
+    for (const action of actions) {
+      indegree.set(action.dev_id, 0);
+      outgoing.set(action.dev_id, []);
+    }
+
+    for (const action of actions) {
+      for (const dependency of action.dependencies) {
+        if (dependency === action.dev_id) {
+          logger.warn(
+            `[DEPLOY][RUN][ORDER] Ignoring self dependency dev_id=${action.dev_id}`,
+          );
+          continue;
+        }
+        if (!byDevId.has(dependency)) {
+          logger.warn(
+            `[DEPLOY][RUN][ORDER] Ignoring external dependency not present in plan dev_id=${action.dev_id} dependency=${dependency}`,
+          );
+          continue;
+        }
+        indegree.set(action.dev_id, (indegree.get(action.dev_id) ?? 0) + 1);
+        outgoing.get(dependency)?.push(action.dev_id);
+      }
+    }
+
+    const queue: string[] = [];
+    for (const action of actions) {
+      if ((indegree.get(action.dev_id) ?? 0) === 0) {
+        queue.push(action.dev_id);
+      }
+    }
+    queue.sort((a, b) => this.compareActionsForRuntimeOrder(byDevId.get(a)!, byDevId.get(b)!));
+
+    const result: PlanActionItem[] = [];
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      if (!currentId) {
+        break;
+      }
+      const action = byDevId.get(currentId);
+      if (!action) {
+        continue;
+      }
+      result.push(action);
+
+      for (const dependentId of outgoing.get(currentId) ?? []) {
+        const next = (indegree.get(dependentId) ?? 0) - 1;
+        indegree.set(dependentId, next);
+        if (next === 0) {
+          queue.push(dependentId);
+          queue.sort((a, b) =>
+            this.compareActionsForRuntimeOrder(byDevId.get(a)!, byDevId.get(b)!),
+          );
+        }
+      }
+    }
+
+    if (result.length !== actions.length) {
+      const placed = new Set(result.map((action) => action.dev_id));
+      const remaining = actions
+        .filter((action) => !placed.has(action.dev_id))
+        .sort((a, b) => this.compareActionsForRuntimeOrder(a, b));
+
+      logger.warn(
+        `[DEPLOY][RUN][ORDER] Cycle detected in plan dependencies; applying deterministic fallback for remaining actions=${remaining.length}`,
+      );
+      result.push(...remaining);
+    }
+
+    logger.debug(
+      `[DEPLOY][RUN][ORDER] Runtime topological order applied actions=${result.length}`,
+    );
+    return result;
+  }
+
+  private compareActionsForRuntimeOrder(a: PlanActionItem, b: PlanActionItem): number {
+    const typeWeight = (type: PlanActionItem["type"]): number => {
+      if (type === "CREDENTIAL") return 1;
+      if (type === "DATATABLE") return 2;
+      return 3;
+    };
+    const typeDiff = typeWeight(a.type) - typeWeight(b.type);
+    if (typeDiff !== 0) {
+      return typeDiff;
+    }
+    if (a.order !== b.order) {
+      return a.order - b.order;
+    }
+    return a.name.localeCompare(b.name);
+  }
+
+  private async postWorkflowWrite(
+    prodWorkflowId: string,
+    action: PlanActionItem,
+    rootWorkflowDevId: string,
+  ): Promise<void> {
+    if (action.dev_id === rootWorkflowDevId) {
+      logger.info(
+        `[DEPLOY][RUN][WORKFLOW] Skip auto-publish for ROOT workflow name="${action.name}" prod_id=${prodWorkflowId}`,
+      );
+      return;
+    }
+
+    logger.info(
+      `[DEPLOY][RUN][WORKFLOW] Auto-publishing sub-workflow name="${action.name}" prod_id=${prodWorkflowId}`,
+    );
+    await this.prodClient.activateWorkflow(prodWorkflowId);
+  }
+
+  private isWorkflowActive(workflow: unknown): boolean {
+    if (!workflow || typeof workflow !== "object" || Array.isArray(workflow)) {
+      return false;
+    }
+    const candidate = workflow as Record<string, unknown>;
+    return candidate.active === true;
   }
 }

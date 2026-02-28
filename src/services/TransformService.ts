@@ -34,6 +34,14 @@ export class TransformService {
           continue;
         }
 
+        if (
+          key === "errorWorkflow" &&
+          path[path.length - 1] === "settings" &&
+          this.patchReferenceField(result, key, child, idMap)
+        ) {
+          continue;
+        }
+
         result[key] = this.walk(child, nextPath, idMap);
       }
 

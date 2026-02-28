@@ -11,13 +11,13 @@ export const N8nNodeSchema = z.object({
   type: z.string(),
   parameters: z.record(z.any()).optional(),
   credentials: z.record(N8nCredentialRefSchema).optional(),
-});
+}).passthrough();
 
 export const N8nWorkflowSchema = z.object({
   id: z.union([z.string(), z.number()]).transform((v) => String(v)),
   name: z.string(),
   nodes: z.array(N8nNodeSchema),
-});
+}).passthrough();
 
 export const N8nCredentialSchema = z.object({
   id: z.union([z.string(), z.number()]).transform((v) => String(v)),

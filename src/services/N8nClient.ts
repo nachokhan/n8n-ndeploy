@@ -55,6 +55,20 @@ function normalizeAxiosError(error: unknown, context: Record<string, unknown>): 
 export class N8nClient {
   private readonly api: AxiosInstance;
   private credentialCache: CredentialListItem[] | null = null;
+  private readonly allowedWorkflowSettingsKeys = new Set([
+    "saveExecutionProgress",
+    "saveManualExecutions",
+    "saveDataErrorExecution",
+    "saveDataSuccessExecution",
+    "executionTimeout",
+    "errorWorkflow",
+    "timezone",
+    "executionOrder",
+    "callerPolicy",
+    "callerIds",
+    "timeSavedPerExecution",
+    "availableInMCP",
+  ]);
 
   constructor(baseURL: string, apiKey: string) {
     this.api = axios.create({
@@ -93,19 +107,49 @@ export class N8nClient {
 
   async createWorkflow(payload: unknown): Promise<N8nWorkflow> {
     try {
-      const response = await this.api.post(`/api/v1/workflows`, payload);
+      const sanitized = this.sanitizeWorkflowForWrite(payload);
+      logger.debug(
+        `[N8N_CLIENT] create workflow payload keys=${Object.keys(sanitized).join(",")}`,
+      );
+      const response = await this.api.post(`/api/v1/workflows`, sanitized);
       return N8nWorkflowSchema.parse(response.data);
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       throw normalizeAxiosError(error, { entity: "workflow", op: "create" });
     }
   }
 
   async updateWorkflow(id: string, payload: unknown): Promise<N8nWorkflow> {
     try {
-      const response = await this.api.put(`/api/v1/workflows/${id}`, payload);
+      const sanitized = this.sanitizeWorkflowForWrite(payload);
+      logger.debug(
+        `[N8N_CLIENT] update workflow id=${id} payload keys=${Object.keys(sanitized).join(",")}`,
+      );
+      const response = await this.api.put(`/api/v1/workflows/${id}`, sanitized);
       return N8nWorkflowSchema.parse(response.data);
     } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
       throw normalizeAxiosError(error, { entity: "workflow", op: "update", id });
+    }
+  }
+
+  async activateWorkflow(id: string): Promise<void> {
+    try {
+      await this.api.post(`/api/v1/workflows/${id}/activate`);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "workflow", op: "activate", id });
+    }
+  }
+
+  async deactivateWorkflow(id: string): Promise<void> {
+    try {
+      await this.api.post(`/api/v1/workflows/${id}/deactivate`);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "workflow", op: "deactivate", id });
     }
   }
 
@@ -509,6 +553,61 @@ export class N8nClient {
       }
     }
     return [...fields];
+  }
+
+  private sanitizeWorkflowForWrite(payload: unknown): Record<string, unknown> {
+    const source = this.asRecord(payload) ?? {};
+    const name = source.name;
+    const nodes = source.nodes;
+    const connections = source.connections;
+    const settings = source.settings;
+    const staticData = source.staticData;
+
+    if (typeof name !== "string" || !Array.isArray(nodes) || !this.asRecord(connections)) {
+      throw new ApiError("Workflow payload missing required write fields", 422, {
+        entity: "workflow",
+        op: "sanitize",
+        hasName: typeof name === "string",
+        hasNodes: Array.isArray(nodes),
+        hasConnections: !!this.asRecord(connections),
+      });
+    }
+
+    const sanitizedSettings = this.sanitizeWorkflowSettings(settings);
+    const sanitized: Record<string, unknown> = {
+      name,
+      nodes,
+      connections,
+      settings: sanitizedSettings,
+    };
+
+    if (staticData !== undefined) {
+      sanitized.staticData = staticData;
+    }
+
+    return sanitized;
+  }
+
+  private sanitizeWorkflowSettings(settings: unknown): Record<string, unknown> {
+    const source = this.asRecord(settings) ?? {};
+    const sanitized: Record<string, unknown> = {};
+    const removedKeys: string[] = [];
+
+    for (const [key, value] of Object.entries(source)) {
+      if (this.allowedWorkflowSettingsKeys.has(key)) {
+        sanitized[key] = value;
+      } else {
+        removedKeys.push(key);
+      }
+    }
+
+    if (removedKeys.length > 0) {
+      logger.warn(
+        `[N8N_CLIENT] workflow settings dropped unsupported keys=${removedKeys.join(",")}`,
+      );
+    }
+
+    return sanitized;
   }
 
   private sanitizeDataTableRows(

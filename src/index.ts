@@ -10,7 +10,7 @@ async function main(): Promise<void> {
   const program = new Command();
 
   program
-    .name("n8n-deployer")
+    .name("ndeploy")
     .description("Deterministic and idempotent n8n DEV->PROD deployment CLI")
     .version("1.0.0");
 

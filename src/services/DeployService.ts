@@ -32,14 +32,50 @@ export class DeployService {
         }
       });
 
-      await this.runStep("VAL", "03", "Validate DEV checksum has not changed", async () => {
-        const currentRoot = await this.devClient.getWorkflowById(parsed.data.metadata.root_workflow_id);
-        const currentHash = sha256(currentRoot);
-        if (currentHash !== parsed.data.metadata.checksum_root) {
-          throw new ValidationError("DEV root workflow has changed since plan generation", {
-            expected: parsed.data.metadata.checksum_root,
-            actual: currentHash,
-          });
+      await this.runStep("VAL", "03", "Validate DEV workflow checksums have not changed", async () => {
+        const workflowActions = parsed.data.actions.filter((action) => action.type === "WORKFLOW");
+        logger.debug(
+          `[DEPLOY][VAL][03] validating checksum for workflow actions=${workflowActions.length}`,
+        );
+
+        for (const action of workflowActions) {
+          const payload = action.payload as { checksum?: unknown };
+          if (typeof payload.checksum !== "string" || payload.checksum.length === 0) {
+            throw new ValidationError(
+              "Workflow payload checksum missing. Regenerate plan before deploy.",
+              {
+                action_order: action.order,
+                workflow_name: action.name,
+                workflow_dev_id: action.dev_id,
+              },
+            );
+          }
+
+          const currentWorkflow = await this.devClient.getWorkflowById(action.dev_id);
+          const currentHash = sha256(currentWorkflow);
+          if (currentHash !== payload.checksum) {
+            throw new ValidationError("DEV workflow has changed since plan generation", {
+              action_order: action.order,
+              workflow_name: action.name,
+              workflow_dev_id: action.dev_id,
+              expected: payload.checksum,
+              actual: currentHash,
+            });
+          }
+
+          if (action.dev_id === parsed.data.metadata.root_workflow_id) {
+            if (currentHash !== parsed.data.metadata.checksum_root) {
+              throw new ValidationError(
+                "Root workflow checksum mismatch between metadata and workflow action payload",
+                {
+                  workflow_dev_id: action.dev_id,
+                  metadata_checksum_root: parsed.data.metadata.checksum_root,
+                  action_checksum: payload.checksum,
+                  current_dev_checksum: currentHash,
+                },
+              );
+            }
+          }
         }
       });
 

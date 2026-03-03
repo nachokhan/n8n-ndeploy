@@ -70,6 +70,12 @@ ndeploy apply <plan_file_path>
 
 Ejecuta el plan en PROD (credenciales, data tables, workflows).
 
+Forzar updates de workflows aunque PROD ya sea equivalente:
+
+```bash
+ndeploy apply <plan_file_path> --force-update
+```
+
 ### 3) Publicar manualmente
 
 ```bash
@@ -98,6 +104,9 @@ Comando manual para publicar el root workflow (u otro workflow) en PROD.
   - Diferencias de esquema agregan warnings en el plan.
 - Workflows:
   - El payload se sanitiza para cumplir el schema público de n8n.
+  - Antes de ejecutar, se valida freshness en DEV para todas las acciones workflow (`payload.checksum`).
+  - Las acciones `UPDATE` se omiten si el contenido normalizado en PROD ya es equivalente.
+  - `--force-update` desactiva ese skip y fuerza la ejecución de updates de workflow.
   - Se parchean IDs en:
     - `node.credentials.*.id`
     - `parameters.workflowId`

@@ -70,6 +70,12 @@ ndeploy apply <plan_file_path>
 
 Führt den Plan in PROD aus (Credentials, Data Tables, Workflows).
 
+Workflow-Updates erzwingen, auch wenn PROD bereits äquivalent ist:
+
+```bash
+ndeploy apply <plan_file_path> --force-update
+```
+
 ### 3) Manuell veröffentlichen
 
 ```bash
@@ -98,6 +104,9 @@ Manueller Publish-Befehl für Root-Workflow (oder beliebigen Workflow) in PROD.
   - Schema-Unterschiede erzeugen Warnings im Plan.
 - Workflows:
   - Schreib-Payload wird auf n8n-API-Schema bereinigt.
+  - Vor der Ausführung wird die DEV-Freshness für alle Workflow-Aktionen geprüft (`payload.checksum`).
+  - `UPDATE`-Aktionen werden übersprungen, wenn der normalisierte PROD-Inhalt bereits äquivalent ist.
+  - `--force-update` deaktiviert dieses Skip-Verhalten und erzwingt Workflow-Updates.
   - ID-Patching in:
     - `node.credentials.*.id`
     - `parameters.workflowId`

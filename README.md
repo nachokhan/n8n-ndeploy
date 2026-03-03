@@ -70,6 +70,12 @@ ndeploy apply <plan_file_path>
 
 Executes the plan in PROD (credentials, data tables, workflows).
 
+Force workflow updates even when PROD already matches:
+
+```bash
+ndeploy apply <plan_file_path> --force-update
+```
+
 ### 3) Manual Publish
 
 ```bash
@@ -98,6 +104,9 @@ Manual publish command for root workflow (or any workflow) in PROD.
   - Schema mismatch adds warnings in the plan.
 - Workflows:
   - Write payloads are sanitized to comply with n8n public API schema.
+  - Before execution, DEV freshness is validated for all workflow actions (`payload.checksum`).
+  - `UPDATE` actions are skipped when normalized PROD content is already equivalent.
+  - `--force-update` disables skip logic and always executes workflow updates.
   - ID patching targets:
     - `node.credentials.*.id`
     - `parameters.workflowId`

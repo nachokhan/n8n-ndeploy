@@ -5,11 +5,16 @@ import { ApiError, ValidationError } from "../errors/index.js";
 import { sha256 } from "../utils/hash.js";
 import { logger } from "../utils/logger.js";
 
+interface DeployServiceOptions {
+  forceUpdate?: boolean;
+}
+
 export class DeployService {
   constructor(
     private readonly devClient: N8nClient,
     private readonly prodClient: N8nClient,
     private readonly transformService: TransformService,
+    private readonly options: DeployServiceOptions = {},
   ) {}
 
   async validatePlan(plan: unknown): Promise<DeploymentPlan> {
@@ -241,9 +246,36 @@ export class DeployService {
           name: action.name,
         });
       }
+      let currentProdWorkflow: unknown | null = null;
+      const mustLoadCurrentProd =
+        action.dev_id === rootWorkflowDevId || !this.options.forceUpdate;
+      if (mustLoadCurrentProd) {
+        currentProdWorkflow = await this.prodClient.getWorkflowById(targetId);
+      }
+
+      if (!this.options.forceUpdate) {
+        const normalizedDesired = this.prodClient.normalizeWorkflowForWrite(patchedWorkflow);
+        const normalizedCurrent = this.prodClient.normalizeWorkflowForWrite(currentProdWorkflow);
+        const desiredHash = sha256(normalizedDesired);
+        const currentHash = sha256(normalizedCurrent);
+        if (desiredHash === currentHash) {
+          logger.info(
+            `[DEPLOY][RUN][WORKFLOW] SKIP UPDATE (unchanged in PROD) name="${action.name}" prod_id=${targetId} checksum=${currentHash.slice(0, 8)}`,
+          );
+          idMap[action.dev_id] = targetId;
+          return;
+        }
+        logger.debug(
+          `[DEPLOY][RUN][WORKFLOW] UPDATE required (diff detected) name="${action.name}" target_prod_id=${targetId} checksum_current=${currentHash.slice(0, 8)} checksum_desired=${desiredHash.slice(0, 8)}`,
+        );
+      } else {
+        logger.info(
+          `[DEPLOY][RUN][WORKFLOW] FORCED UPDATE (--force-update) name="${action.name}" target_prod_id=${targetId}`,
+        );
+      }
+
       if (action.dev_id === rootWorkflowDevId) {
-        const currentRoot = await this.prodClient.getWorkflowById(targetId);
-        if (this.isWorkflowActive(currentRoot)) {
+        if (this.isWorkflowActive(currentProdWorkflow)) {
           logger.info(
             `[DEPLOY][RUN][WORKFLOW] Root workflow is active, deactivating before update id=${targetId}`,
           );

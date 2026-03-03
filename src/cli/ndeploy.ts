@@ -12,19 +12,26 @@ export function registerNDeployCommand(program: Command): void {
   program
     .command("apply")
     .argument("<plan_file_path>", "Path to plan JSON")
+    .option(
+      "--force-update",
+      "Always execute workflow UPDATE actions, even when PROD content is already equivalent",
+    )
     .description("Execute deployment plan in PROD")
-    .action(async (planFilePath: string) => {
+    .action(async (planFilePath: string, options: { forceUpdate?: boolean }) => {
       const validateSpinner = ora("Preparing ndeploy execution").start();
       let deploySpinner: ReturnType<typeof ora> | null = null;
       try {
         const env = loadEnv();
         validateSpinner.succeed("Environment loaded");
         logger.info(`[NDEPLOY] plan_file=${planFilePath}`);
+        logger.info(`[NDEPLOY] force_update=${options.forceUpdate === true}`);
         logger.debug(`[NDEPLOY] source=${env.N8N_DEV_URL} target=${env.N8N_PROD_URL}`);
 
         const devClient = new N8nClient(env.N8N_DEV_URL, env.N8N_DEV_API_KEY);
         const prodClient = new N8nClient(env.N8N_PROD_URL, env.N8N_PROD_API_KEY);
-        const service = new DeployService(devClient, prodClient, new TransformService());
+        const service = new DeployService(devClient, prodClient, new TransformService(), {
+          forceUpdate: options.forceUpdate === true,
+        });
 
         logger.info("[NDEPLOY] Reading plan file");
         const rawPlan = await readJsonFile<unknown>(planFilePath);

@@ -137,6 +137,10 @@ export class N8nClient {
     }
   }
 
+  normalizeWorkflowForWrite(payload: unknown): Record<string, unknown> {
+    return this.sanitizeWorkflowForWrite(payload);
+  }
+
   async activateWorkflow(id: string): Promise<void> {
     try {
       await this.api.post(`/api/v1/workflows/${id}/activate`);

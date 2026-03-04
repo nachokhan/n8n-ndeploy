@@ -4,8 +4,7 @@
   "description": "Deterministic idempotent n8n deployment CLI",
   "main": "dist/index.js",
   "bin": {
-    "ndeploy": "dist/index.js",
-    "n8n-deployer": "dist/index.js"
+    "ndeploy": "dist/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -1,6 +1,6 @@
 {
   "name": "n8n-deployer",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Deterministic idempotent n8n deployment CLI",
   "main": "dist/index.js",
   "bin": {

@@ -116,6 +116,32 @@ ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```
 
+### 5) Find Orphans
+
+```bash
+ndeploy orphans --side <source|target>
+```
+
+Lists entities not referenced by any non-archived workflow and prints pretty JSON.
+
+- `--side` is required:
+  - `source` -> uses `N8N_DEV_*`
+  - `target` -> uses `N8N_PROD_*`
+- Entity filters:
+  - `--workflows`
+  - `--credentials`
+  - `--data-tables` (alias: `--datatables`)
+  - `--all`
+- If no entity filter is provided, it defaults to `--all`.
+
+Examples:
+
+```bash
+ndeploy orphans --side target
+ndeploy orphans --side source --credentials
+ndeploy orphans --side target --workflows --datatables
+```
+
 ## Recommended Flow
 
 1. `ndeploy plan flow <workflow_id_dev>`
@@ -170,7 +196,7 @@ npm run build
 
 ```text
 src/
-  cli/            # plan/apply/publish/remove commands
+  cli/            # plan/apply/publish/remove/orphans commands
   services/       # API, planning, deploy, transforms
   types/          # Zod schemas + TS types
   utils/          # env, logger, hash, file helpers

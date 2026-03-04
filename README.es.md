@@ -116,6 +116,32 @@ ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```
 
+### 5) Buscar huérfanos
+
+```bash
+ndeploy orphans --side <source|target>
+```
+
+Enumera entidades no referenciadas por ningún workflow no archivado y devuelve JSON pretty.
+
+- `--side` es obligatorio:
+  - `source` -> usa `N8N_DEV_*`
+  - `target` -> usa `N8N_PROD_*`
+- Filtros de entidad:
+  - `--workflows`
+  - `--credentials`
+  - `--data-tables` (alias: `--datatables`)
+  - `--all`
+- Si no pasas filtros de entidad, se asume `--all`.
+
+Ejemplos:
+
+```bash
+ndeploy orphans --side target
+ndeploy orphans --side source --credentials
+ndeploy orphans --side target --workflows --datatables
+```
+
 ## Flujo recomendado
 
 1. `ndeploy plan flow <workflow_id_dev>`
@@ -168,7 +194,7 @@ npm run build
 
 ```text
 src/
-  cli/            # comandos plan/apply/publish/remove
+  cli/            # comandos plan/apply/publish/remove/orphans
   services/       # API, planificación, deploy, transformaciones
   types/          # schemas Zod + tipos TS
   utils/          # env, logger, hash, helpers de archivos

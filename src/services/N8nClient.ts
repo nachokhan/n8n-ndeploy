@@ -28,10 +28,27 @@ interface CredentialPlaceholderDataInfo {
   propertyTypes: Record<string, string>;
 }
 
+export interface WorkflowSummaryItem {
+  id: string;
+  name: string;
+  archived: boolean;
+}
+
+export interface CredentialSummaryItem {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface DataTableSummaryItem {
+  id: string;
+  name: string;
+}
+
 const WorkflowSummarySchema = z.object({
   id: z.union([z.string(), z.number()]).transform((v) => String(v)),
   name: z.string(),
-});
+}).passthrough();
 
 const CredentialListItemSchema = z.object({
   id: z.union([z.string(), z.number()]).transform((v) => String(v)),
@@ -158,11 +175,20 @@ export class N8nClient {
   }
 
   async listWorkflowIds(): Promise<string[]> {
+    const summaries = await this.listWorkflowsSummary();
+    return summaries.map((workflow) => workflow.id);
+  }
+
+  async listWorkflowsSummary(): Promise<WorkflowSummaryItem[]> {
     try {
       const response = await this.api.get<ListResponse<unknown>>(`/api/v1/workflows`);
       const list = response.data?.data ?? [];
       const parsed = z.array(WorkflowSummarySchema).parse(list);
-      return parsed.map((workflow) => workflow.id);
+      return parsed.map((workflow) => ({
+        id: workflow.id,
+        name: workflow.name,
+        archived: this.parseArchivedValue(workflow),
+      }));
     } catch (error) {
       throw normalizeAxiosError(error, { entity: "workflow", op: "list" });
     }
@@ -287,6 +313,15 @@ export class N8nClient {
     return list.map((credential) => credential.id);
   }
 
+  async listCredentialsSummary(): Promise<CredentialSummaryItem[]> {
+    const list = await this.listCredentials();
+    return list.map((credential) => ({
+      id: credential.id,
+      name: credential.name,
+      type: credential.type ?? "unknown",
+    }));
+  }
+
   async deleteCredential(id: string): Promise<void> {
     try {
       await this.api.delete(`/api/v1/credentials/${id}`);
@@ -356,11 +391,16 @@ export class N8nClient {
   }
 
   async listDataTableIds(): Promise<string[]> {
+    const summaries = await this.listDataTablesSummary();
+    return summaries.map((table) => table.id);
+  }
+
+  async listDataTablesSummary(): Promise<DataTableSummaryItem[]> {
     try {
       const response = await this.api.get<ListResponse<unknown>>(`/api/v1/data-tables`);
       const list = response.data?.data ?? [];
       const parsed = z.array(DataTableSummarySchema).parse(list);
-      return parsed.map((table) => table.id);
+      return parsed.map((table) => ({ id: table.id, name: table.name }));
     } catch (error) {
       throw normalizeAxiosError(error, { entity: "data-table", op: "list" });
     }
@@ -584,6 +624,19 @@ export class N8nClient {
       return [];
     }
     return value.filter((item): item is string => typeof item === "string");
+  }
+
+  private parseArchivedValue(workflowSummary: z.infer<typeof WorkflowSummarySchema>): boolean {
+    const raw = workflowSummary as Record<string, unknown>;
+    const isArchived = raw.isArchived;
+    if (typeof isArchived === "boolean") {
+      return isArchived;
+    }
+    const archived = raw.archived;
+    if (typeof archived === "boolean") {
+      return archived;
+    }
+    return false;
   }
 
   private extractMissingRequiredFields(apiError: ApiError): string[] {

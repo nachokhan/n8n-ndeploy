@@ -11,6 +11,7 @@ No está orientado a la implementación interna, sino a la operación diaria.
 2. Aplicar ese plan en PROD.
 3. Publicar manualmente un workflow en PROD (por ejemplo, el root).
 4. Eliminar recursos en PROD (workflows, credenciales, data tables).
+5. Detectar entidades huérfanas (no referenciadas).
 
 ## 2. Requisitos previos
 
@@ -101,6 +102,33 @@ Ejemplos:
 ndeploy remove --workflows 12,18 --yes
 ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
+```
+
+## 4.5 Detectar huérfanos
+
+```bash
+ndeploy orphans --side <source|target>
+```
+
+Reglas:
+
+1. `--side` es obligatorio.
+2. `source` usa variables `N8N_DEV_*`; `target` usa `N8N_PROD_*`.
+3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
+4. Si no pasas filtros de entidad, se asume `--all`.
+5. Los workflows archivados se consideran borrados y no cuentan para referencias.
+
+Salida:
+
+1. Imprime JSON pretty con listas de huérfanos por entidad.
+2. En credenciales incluye `type`.
+
+Ejemplos:
+
+```bash
+ndeploy orphans --side target
+ndeploy orphans --side source --credentials
+ndeploy orphans --side target --workflows --datatables
 ```
 
 ## 5. Flujo recomendado de uso
@@ -294,10 +322,12 @@ ndeploy plan --help
 ndeploy apply --help
 ndeploy publish --help
 ndeploy remove --help
+ndeploy orphans --help
 
 # Flujo base
 ndeploy plan flow <workflow_id_dev>
 ndeploy apply <plan_file_path>
 ndeploy publish <workflow_id_prod>
 ndeploy remove --all --yes
+ndeploy orphans --side target
 ```

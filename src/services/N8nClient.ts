@@ -157,6 +157,25 @@ export class N8nClient {
     }
   }
 
+  async listWorkflowIds(): Promise<string[]> {
+    try {
+      const response = await this.api.get<ListResponse<unknown>>(`/api/v1/workflows`);
+      const list = response.data?.data ?? [];
+      const parsed = z.array(WorkflowSummarySchema).parse(list);
+      return parsed.map((workflow) => workflow.id);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "workflow", op: "list" });
+    }
+  }
+
+  async deleteWorkflow(id: string): Promise<void> {
+    try {
+      await this.api.delete(`/api/v1/workflows/${id}`);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "workflow", op: "delete", id });
+    }
+  }
+
   async getCredentialById(id: string): Promise<N8nCredential> {
     try {
       const list = await this.listCredentials();
@@ -263,6 +282,22 @@ export class N8nClient {
     });
   }
 
+  async listCredentialIds(): Promise<string[]> {
+    const list = await this.listCredentials();
+    return list.map((credential) => credential.id);
+  }
+
+  async deleteCredential(id: string): Promise<void> {
+    try {
+      await this.api.delete(`/api/v1/credentials/${id}`);
+      if (this.credentialCache) {
+        this.credentialCache = this.credentialCache.filter((credential) => credential.id !== id);
+      }
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "credential", op: "delete", id });
+    }
+  }
+
   async getDataTableById(id: string): Promise<N8nDataTable> {
     try {
       const response = await this.api.get(`/api/v1/data-tables/${id}`);
@@ -317,6 +352,25 @@ export class N8nClient {
         throw error;
       }
       throw normalizeAxiosError(error, { entity: "data-table", op: "create" });
+    }
+  }
+
+  async listDataTableIds(): Promise<string[]> {
+    try {
+      const response = await this.api.get<ListResponse<unknown>>(`/api/v1/data-tables`);
+      const list = response.data?.data ?? [];
+      const parsed = z.array(DataTableSummarySchema).parse(list);
+      return parsed.map((table) => table.id);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "data-table", op: "list" });
+    }
+  }
+
+  async deleteDataTable(id: string): Promise<void> {
+    try {
+      await this.api.delete(`/api/v1/data-tables/${id}`);
+    } catch (error) {
+      throw normalizeAxiosError(error, { entity: "data-table", op: "delete", id });
     }
   }
 

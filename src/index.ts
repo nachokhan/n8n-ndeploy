@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { registerNPlanCommand } from "./cli/nplan.js";
 import { registerNDeployCommand } from "./cli/ndeploy.js";
 import { registerNPublishCommand } from "./cli/npublish.js";
+import { registerNRemoveCommand } from "./cli/nremove.js";
 import { ApiError, DependencyError, ValidationError } from "./errors/index.js";
 import { logger } from "./utils/logger.js";
 
@@ -17,6 +18,7 @@ async function main(): Promise<void> {
   registerNPlanCommand(program);
   registerNDeployCommand(program);
   registerNPublishCommand(program);
+  registerNRemoveCommand(program);
 
   try {
     await program.parseAsync(process.argv);

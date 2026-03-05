@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format follows Keep a Changelog and Semantic Versioning.
 
+## [1.3.0] - 2026-03-04
+### Added
+- New `ndeploy dangling-refs` command (alias: `ndeploy dangling`) to detect missing referenced entities.
+- Required `--side <source|target>` option for `dangling-refs`.
+- Reference filters for `dangling-refs`: `--workflows`, `--credentials`, `--data-tables`/`--datatables`, and `--all`.
+- Pretty JSON output with summary and per-workflow dangling reference details.
+
+### Changed
+- Documentation updated in `README.md`, `README.es.md`, `README.de.md`, `MANUAL.md`, and `docs/index.html`.
+
 ## [1.2.0] - 2026-03-04
 ### Added
 - New `ndeploy orphans` command to list unreferenced entities.

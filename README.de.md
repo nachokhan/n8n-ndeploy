@@ -108,6 +108,7 @@ Löscht ausgewählte Ressourcen in PROD.
 - IDs als CSV: `id1,id2,id3`
 - Alias: `--datatables` (gleich wie `--data-tables`)
 - Shortcut für alles: `--all`
+- `--archived-workflows` begrenzt Workflow-Löschungen auf archivierte Workflows
 - Bestätigung:
   - mit `--yes`: sofort ausführen
   - ohne `--yes`: interaktive Eingabe von `yes` in der Konsole
@@ -116,6 +117,7 @@ Beispiele:
 
 ```bash
 ndeploy remove --workflows 12,18 --yes
+ndeploy remove --workflows all --archived-workflows --yes
 ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```

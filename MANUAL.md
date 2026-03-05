@@ -91,6 +91,7 @@ Reglas:
 2. IDs se pasan en formato CSV (`id1,id2,id3`).
 3. `--all` selecciona todo (workflows, credenciales y data tables).
 4. `--datatables` es alias de `--data-tables`.
+5. `--archived-workflows` limita el borrado de workflows solo a archivados.
 
 Confirmación de seguridad:
 
@@ -101,6 +102,7 @@ Ejemplos:
 
 ```bash
 ndeploy remove --workflows 12,18 --yes
+ndeploy remove --workflows all --archived-workflows --yes
 ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```

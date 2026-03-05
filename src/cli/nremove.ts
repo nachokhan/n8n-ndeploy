@@ -19,6 +19,7 @@ type TargetSelection =
 
 interface RemoveCommandOptions {
   workflows?: string;
+  archivedWorkflows?: boolean;
   credentials?: string;
   dataTables?: string;
   datatables?: string;
@@ -33,6 +34,7 @@ export function registerNRemoveCommand(program: Command): void {
     .command("remove")
     .description("Remove workflows, credentials, and/or data tables from PROD")
     .option("--workflows <ids|all>", "Workflow IDs in PROD separated by commas, or 'all'")
+    .option("--archived-workflows", "Remove only archived workflows")
     .option("--credentials <ids|all>", "Credential IDs in PROD separated by commas, or 'all'")
     .option("--data-tables <ids|all>", "Data table IDs in PROD separated by commas, or 'all'")
     .option("--datatables <ids|all>", "Alias of --data-tables")
@@ -57,6 +59,19 @@ export function registerNRemoveCommand(program: Command): void {
           dataTablesSelection = dataTablesSelection ?? { mode: "all" };
         }
 
+        if (options.archivedWorkflows === true) {
+          const archivedWorkflowIds = await listArchivedWorkflowIds(prodClient);
+          if (!workflowsSelection || workflowsSelection.mode === "all") {
+            workflowsSelection = { mode: "ids", ids: archivedWorkflowIds };
+          } else {
+            const archivedSet = new Set(archivedWorkflowIds);
+            workflowsSelection = {
+              mode: "ids",
+              ids: workflowsSelection.ids.filter((id) => archivedSet.has(id)),
+            };
+          }
+        }
+
         if (!workflowsSelection && !credentialsSelection && !dataTablesSelection) {
           throw new ValidationError(
             "Nothing selected to remove. Use at least one of --workflows, --credentials, --data-tables, or --all.",
@@ -72,6 +87,7 @@ export function registerNRemoveCommand(program: Command): void {
           side: "target",
           instance: env.N8N_PROD_URL,
           dry_run: options.dryRun === true,
+          archived_workflows_only: options.archivedWorkflows === true,
           selected: {
             workflows: workflowIds,
             credentials: credentialIds,
@@ -153,6 +169,11 @@ export function registerNRemoveCommand(program: Command): void {
     });
 
   logger.debug("Command remove registered");
+}
+
+async function listArchivedWorkflowIds(prodClient: N8nClient): Promise<string[]> {
+  const workflows = await prodClient.listWorkflowsSummary();
+  return workflows.filter((workflow) => workflow.archived).map((workflow) => workflow.id);
 }
 
 async function writeResultFileIfRequested(outputPath: string | undefined, data: unknown): Promise<void> {

@@ -61,6 +61,10 @@ N8N_PROD_URL=http://localhost:5679
 N8N_PROD_API_KEY=prod_api_key
 ```
 
+## Vista rápida
+
+![Guía profesional de Ndeploy](./img/ndeploy_guide.png)
+
 ## Comandos
 
 ### 1) Generar plan

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NDploy Docs | Plan and Apply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../logo.png" alt="NDploy logo">
+        <strong>ndploy docs</strong>
+      </div>
+      <nav class="nav">
+        <a href="./index.html">Technical Overview</a>
+        <a class="active" href="./plan-apply.html">Plan and Apply</a>
+        <a href="./observability.html">Observability</a>
+        <a href="./operations.html">Operations and Safety</a>
+      </nav>
+      <div class="footer-links">
+        <a href="../index.html">Main site</a>
+        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <span class="badge pink">Execution Flow</span>
+      <h1>Plan and Apply</h1>
+      <p>
+        NDploy splits rollout into two explicit phases. This is not just a UX choice: it is the mechanism that enables review,
+        reproducibility, and safer execution in environments with mutable state.
+      </p>
+
+      <h2>Plan Phase: What It Produces</h2>
+      <p>
+        <code>ndeploy plan flow &lt;workflow_id_dev&gt;</code> creates a JSON file that contains metadata and ordered actions.
+      </p>
+      <ul>
+        <li>Metadata: source/target instances, root workflow id, generation timestamp.</li>
+        <li>Action list for credentials, data tables, and workflows.</li>
+        <li>Dependencies for topological ordering.</li>
+        <li>Workflow payload snapshots and DEV freshness checksums.</li>
+      </ul>
+
+      <h3>Action Semantics</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Action</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Credential</td>
+              <td><code>MAP_EXISTING</code></td>
+              <td>Found by name in PROD; map DEV id to existing PROD id.</td>
+            </tr>
+            <tr>
+              <td>Credential</td>
+              <td><code>CREATE</code></td>
+              <td>Missing in PROD; create placeholder without secrets.</td>
+            </tr>
+            <tr>
+              <td>Data Table</td>
+              <td><code>MAP_EXISTING</code> or <code>CREATE</code></td>
+              <td>Matched by name; schema mismatches generate warnings.</td>
+            </tr>
+            <tr>
+              <td>Workflow</td>
+              <td><code>UPDATE</code> or <code>CREATE</code></td>
+              <td>Depends on whether name already exists in PROD.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Apply Phase: Runtime Source of Truth</h2>
+      <p>
+        <code>ndeploy apply &lt;plan_file_path&gt;</code> validates and executes. Runtime state may differ from plan-generation state,
+        so apply re-checks what must be true before writing.
+      </p>
+      <ol>
+        <li>Validate plan schema.</li>
+        <li>Validate root action existence.</li>
+        <li>Validate DEV freshness for workflow payloads.</li>
+        <li>Execute actions in dependency-safe order.</li>
+        <li>Patch references with resolved ID mappings before workflow writes.</li>
+      </ol>
+
+      <h2>Update Skip Logic</h2>
+      <p>
+        For workflow updates, NDploy compares normalized desired vs normalized current PROD payload.
+        If equivalent, update is skipped (unless <code>--force-update</code> is set).
+      </p>
+      <div class="callout">
+        <strong>Important:</strong> a workflow action marked <code>UPDATE</code> in plan does not imply an actual write during apply.
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NDploy Docs | Operations and Safety</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../logo.png" alt="NDploy logo">
+        <strong>ndploy docs</strong>
+      </div>
+      <nav class="nav">
+        <a href="./index.html">Technical Overview</a>
+        <a href="./plan-apply.html">Plan and Apply</a>
+        <a href="./observability.html">Observability</a>
+        <a class="active" href="./operations.html">Operations and Safety</a>
+      </nav>
+      <div class="footer-links">
+        <a href="../index.html">Main site</a>
+        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <span class="badge cyan">Runbook</span>
+      <h1>Operations and Safety</h1>
+      <p>
+        This section is intended as an operator runbook for recurring releases and incident response.
+      </p>
+
+      <h2>Release Checklist</h2>
+      <ol>
+        <li>Generate a fresh plan from the root workflow in DEV.</li>
+        <li>Inspect warnings for schema and mapping concerns.</li>
+        <li>Inspect workflow observability to estimate updates vs likely skips.</li>
+        <li>Apply plan with normal mode first.</li>
+        <li>Publish root workflow explicitly when post-apply checks pass.</li>
+      </ol>
+
+      <h2>When to Use <code>--force-update</code></h2>
+      <ul>
+        <li>When you explicitly want to overwrite equivalent-content protection.</li>
+        <li>When troubleshooting stale state and you need deterministic rewrite behavior.</li>
+      </ul>
+      <p>
+        Do not use <code>--force-update</code> as default. It increases write volume and can hide drift signals.
+      </p>
+
+      <h2>Common Warning Patterns</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Warning</th>
+              <th>Impact</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Data table schema differs from PROD</td>
+              <td>Workflow behavior can diverge at runtime.</td>
+              <td>Validate node expectations and table access before release.</td>
+            </tr>
+            <tr>
+              <td>Workflow observed as different</td>
+              <td>Likely write during apply.</td>
+              <td>Review intended changes, then apply.</td>
+            </tr>
+            <tr>
+              <td>Workflow observed as unknown</td>
+              <td>Pre-apply prediction not reliable.</td>
+              <td>Rely on apply logs for final decision.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Troubleshooting Quick Guide</h2>
+      <h3>Plan validation fails in apply</h3>
+      <p>
+        This usually means DEV changed after plan generation. Regenerate plan and re-run apply.
+      </p>
+
+      <h3>Expected skip but got update</h3>
+      <p>
+        Compare normalized target content and check for real business-level differences like labels, filters, or settings values.
+      </p>
+
+      <h3>Credential-related failures after apply</h3>
+      <p>
+        Verify placeholder credentials were completed with real secrets in PROD.
+      </p>
+
+      <h2>Command Set for Daily Ops</h2>
+      <pre><code>ndeploy plan flow &lt;workflow_id_dev&gt;
+ndeploy apply &lt;plan_file_path&gt;
+ndeploy publish &lt;workflow_id_prod&gt;
+ndeploy orphans --side target
+ndeploy dangling-refs --side target</code></pre>
+    </main>
+  </div>
+</body>
+</html>

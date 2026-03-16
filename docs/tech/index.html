@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NDploy Docs | Technical Overview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../logo.png" alt="NDploy logo">
+        <strong>ndploy docs</strong>
+      </div>
+      <nav class="nav">
+        <a class="active" href="./index.html">Technical Overview</a>
+        <a href="./plan-apply.html">Plan and Apply</a>
+        <a href="./observability.html">Observability</a>
+        <a href="./operations.html">Operations and Safety</a>
+      </nav>
+      <div class="footer-links">
+        <a href="../index.html">Main site</a>
+        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <span class="badge cyan">For Technical Users</span>
+      <h1>Technical Overview</h1>
+      <p>
+        NDploy is a deterministic CLI for promoting n8n workflows from DEV to PROD with dependency awareness and controlled execution.
+        This documentation explains technical behavior from an operator perspective, focusing on guarantees, boundaries, and runtime decisions.
+      </p>
+
+      <h2>Core Model</h2>
+      <ul>
+        <li><strong>Plan phase:</strong> discovers dependencies and builds a reproducible execution plan file.</li>
+        <li><strong>Apply phase:</strong> validates plan freshness and executes actions in dependency order.</li>
+        <li><strong>Publish phase:</strong> explicitly activates workflows after verification.</li>
+      </ul>
+
+      <h2>What NDploy Is Optimized For</h2>
+      <ul>
+        <li>Consistent DEV to PROD promotion for workflows with sub-workflows, credentials, and data tables.</li>
+        <li>Safe, reviewable changes with a file artifact before execution.</li>
+        <li>Idempotent behavior where possible, including update skipping for equivalent PROD content.</li>
+      </ul>
+
+      <h2>Conceptual Guarantees</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Guarantee</th>
+              <th>Limit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Dependency Discovery</td>
+              <td>Recursively includes workflow dependencies required by the root workflow.</td>
+              <td>References outside the analyzed graph are not rewritten unless resolvable in mapping.</td>
+            </tr>
+            <tr>
+              <td>Credential Handling</td>
+              <td>Credentials are mapped by name or created as placeholders.</td>
+              <td>Secret values are not copied across environments.</td>
+            </tr>
+            <tr>
+              <td>Idempotence</td>
+              <td>Equivalent workflow updates can be skipped.</td>
+              <td>Equivalence is structural; external system state is out of scope.</td>
+            </tr>
+            <tr>
+              <td>Safety</td>
+              <td>Root workflow is not auto-published by apply.</td>
+              <td>Operator still decides final activation timing.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Recommended Operational Sequence</h2>
+      <ol>
+        <li>Generate plan: <code>ndeploy plan flow &lt;workflow_id_dev&gt;</code></li>
+        <li>Review plan actions, warnings, and observability fields.</li>
+        <li>Apply plan: <code>ndeploy apply &lt;plan_file_path&gt;</code></li>
+        <li>Publish root workflow manually when release criteria are met.</li>
+      </ol>
+
+      <div class="callout">
+        <strong>Contract:</strong> plan is a point-in-time artifact; apply is the runtime source of truth.
+      </div>
+    </main>
+  </div>
+</body>
+</html>

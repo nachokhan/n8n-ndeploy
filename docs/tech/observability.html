@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NDploy Docs | Observability</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="../logo.png" alt="NDploy logo">
+        <strong>ndploy docs</strong>
+      </div>
+      <nav class="nav">
+        <a href="./index.html">Technical Overview</a>
+        <a href="./plan-apply.html">Plan and Apply</a>
+        <a class="active" href="./observability.html">Observability</a>
+        <a href="./operations.html">Operations and Safety</a>
+      </nav>
+      <div class="footer-links">
+        <a href="../index.html">Main site</a>
+        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <span class="badge amber">Diagnostics</span>
+      <h1>Plan Observability</h1>
+      <p>
+        Workflow actions expose an <code>observability</code> block intended for operator visibility.
+        It is descriptive, not prescriptive.
+      </p>
+
+      <h2>Fields</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Values</th>
+              <th>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>prod_comparison_at_plan</code></td>
+              <td><code>equal|different|unknown|not_applicable</code></td>
+              <td>Point-in-time structural comparison at plan generation.</td>
+            </tr>
+            <tr>
+              <td><code>comparison_reason</code></td>
+              <td>enum reason</td>
+              <td>Machine-readable explanation for the comparison result.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Reason Codes</h2>
+      <ul>
+        <li><code>matched_after_normalization</code>: equivalent after normalization and ID patching.</li>
+        <li><code>content_diff_detected</code>: meaningful structural diff detected.</li>
+        <li><code>unresolved_future_ids</code>: cannot compare confidently because some dependencies are unresolved in plan phase.</li>
+        <li><code>target_missing_in_prod</code>: no workflow target exists in PROD for comparison.</li>
+        <li><code>normalization_failed</code>: comparison pipeline could not normalize safely.</li>
+        <li><code>prod_read_failed</code>: comparison was blocked by inability to fetch target state.</li>
+      </ul>
+
+      <h2>Noise Filtering for Comparison</h2>
+      <p>
+        NDploy ignores non-functional metadata to reduce false positives in equivalence checks. Examples include:
+      </p>
+      <ul>
+        <li><code>nodes[*].id</code></li>
+        <li><code>nodes[*].position</code></li>
+        <li><code>nodes[*].credentials.*.name</code></li>
+        <li><code>staticData</code></li>
+        <li><code>cachedResultUrl</code></li>
+      </ul>
+
+      <h2>Operational Rule</h2>
+      <div class="callout">
+        Use observability to estimate impact before apply, but use apply logs and final status to assert what happened.
+      </div>
+
+      <h2>Example</h2>
+      <pre><code>{
+  "type": "WORKFLOW",
+  "action": "UPDATE",
+  "name": "Billing - Process Invoice",
+  "observability": {
+    "prod_comparison_at_plan": "equal",
+    "comparison_reason": "matched_after_normalization"
+  }
+}</code></pre>
+    </main>
+  </div>
+</body>
+</html>

@@ -11,6 +11,11 @@ export interface WorkspaceMetadata {
   schema_version: number;
   workspace: string;
   name: string;
+  plan: {
+    root_workflow_id_dev: string | null;
+    root_workflow_name: string | null;
+    updated_at: string | null;
+  };
   created_at: string;
   updated_at: string;
 }

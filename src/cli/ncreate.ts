@@ -45,6 +45,11 @@ export function registerNCreateCommand(program: Command): void {
           schema_version: 1,
           workspace,
           name: path.basename(workspaceDir),
+          plan: {
+            root_workflow_id_dev: existingMetadata?.plan?.root_workflow_id_dev ?? null,
+            root_workflow_name: existingMetadata?.plan?.root_workflow_name ?? null,
+            updated_at: existingMetadata?.plan?.updated_at ?? null,
+          },
           created_at: existingMetadata?.created_at ?? now,
           updated_at: now,
         };

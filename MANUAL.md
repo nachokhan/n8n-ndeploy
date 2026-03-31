@@ -148,7 +148,7 @@ ndeploy remove --all --yes
 ## 4.7 Detectar huérfanos
 
 ```bash
-ndeploy orphans --side <source|target>
+ndeploy orphans <workspace> --side <source|target>
 ```
 
 Reglas:
@@ -158,6 +158,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros de entidad, se asume `--all`.
 5. Los workflows archivados se consideran borrados y no cuentan para referencias.
+6. Si no pasas `--output`, guarda en `<workspace>/orphans_<side>.json`.
 
 Salida:
 
@@ -167,15 +168,15 @@ Salida:
 Ejemplos:
 
 ```bash
-ndeploy orphans --side target
-ndeploy orphans --side source --credentials
-ndeploy orphans --side target --workflows --datatables
+ndeploy orphans <workspace> --side target
+ndeploy orphans <workspace> --side source --credentials
+ndeploy orphans <workspace> --side target --workflows --datatables
 ```
 
 ## 4.8 Detectar referencias colgantes
 
 ```bash
-ndeploy dangling-refs --side <source|target>
+ndeploy dangling-refs <workspace> --side <source|target>
 ```
 
 Reglas:
@@ -185,6 +186,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros, se asume `--all`.
 5. Solo se analizan workflows no archivados.
+6. Si no pasas `--output`, guarda en `<workspace>/dangling_<side>.json`.
 
 Salida:
 
@@ -195,9 +197,9 @@ Salida:
 Ejemplos:
 
 ```bash
-ndeploy dangling-refs --side target
-ndeploy dangling --side source --credentials
-ndeploy dangling-refs --side target --workflows --datatables
+ndeploy dangling-refs <workspace> --side target
+ndeploy dangling <workspace> --side source --credentials
+ndeploy dangling-refs <workspace> --side target --workflows --datatables
 ```
 
 ## 5. Flujo recomendado de uso
@@ -413,6 +415,6 @@ ndeploy apply <workspace>
 ndeploy info <workspace>
 ndeploy publish <workflow_id_prod>
 ndeploy remove --all --yes
-ndeploy orphans --side target
-ndeploy dangling-refs --side target
+ndeploy orphans <workspace> --side target
+ndeploy dangling-refs <workspace> --side target
 ```

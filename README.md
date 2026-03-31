@@ -167,7 +167,7 @@ ndeploy remove --all --yes
 ### 7) Find Orphans
 
 ```bash
-ndeploy orphans --side <source|target>
+ndeploy orphans <workspace> --side <source|target>
 ```
 
 Lists entities not referenced by any non-archived workflow and prints pretty JSON.
@@ -181,19 +181,20 @@ Lists entities not referenced by any non-archived workflow and prints pretty JSO
   - `--data-tables` (alias: `--datatables`)
   - `--all`
 - If no entity filter is provided, it defaults to `--all`.
+- Default output file (if `--output` is omitted): `<workspace>/orphans_<side>.json`
 
 Examples:
 
 ```bash
-ndeploy orphans --side target
-ndeploy orphans --side source --credentials
-ndeploy orphans --side target --workflows --datatables
+ndeploy orphans <workspace> --side target
+ndeploy orphans <workspace> --side source --credentials
+ndeploy orphans <workspace> --side target --workflows --datatables
 ```
 
 ### 8) Find Dangling References
 
 ```bash
-ndeploy dangling-refs --side <source|target>
+ndeploy dangling-refs <workspace> --side <source|target>
 ```
 
 Lists workflows that reference entities which no longer exist.
@@ -208,13 +209,14 @@ Lists workflows that reference entities which no longer exist.
   - `--all`
 - If no reference filter is provided, it defaults to `--all`.
 - Alias command: `ndeploy dangling`
+- Default output file (if `--output` is omitted): `<workspace>/dangling_<side>.json`
 
 Examples:
 
 ```bash
-ndeploy dangling-refs --side target
-ndeploy dangling --side source --credentials
-ndeploy dangling-refs --side target --workflows --datatables
+ndeploy dangling-refs <workspace> --side target
+ndeploy dangling <workspace> --side source --credentials
+ndeploy dangling-refs <workspace> --side target --workflows --datatables
 ```
 
 ## Recommended Flow

@@ -1,4 +1,4 @@
-# MASTER SPECIFICATION: n8n-deployer CLI TOOL (ARCHITECT VERSION 2)
+# MASTER SPECIFICATION: NDeploy CLI TOOL (ARCHITECT VERSION 2)
 
 **Role:** Senior Lead Software Engineer / DevOps Architect.
 **Project:** A deterministic, idempotent CLI deployment tool for n8n between DEV and PROD environments.

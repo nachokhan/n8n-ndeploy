@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { N8nClient } from "../services/N8nClient.js";
 import { DeployService } from "../services/DeployService.js";
 import { TransformService } from "../services/TransformService.js";
-import { readJsonFile } from "../utils/file.js";
+import { readJsonFile, resolveWorkspacePlanFilePath } from "../utils/file.js";
 import { loadEnv } from "../utils/env.js";
 import { logger } from "../utils/logger.js";
 import { ApiError, ValidationError } from "../errors/index.js";
@@ -11,18 +11,20 @@ import { ApiError, ValidationError } from "../errors/index.js";
 export function registerNDeployCommand(program: Command): void {
   program
     .command("apply")
-    .argument("<plan_file_path>", "Path to plan JSON")
+    .argument("<workspace>", "Workspace directory")
     .option(
       "--force-update",
       "Always execute workflow UPDATE actions, even when PROD content is already equivalent",
     )
-    .description("Execute deployment plan in PROD")
-    .action(async (planFilePath: string, options: { forceUpdate?: boolean }) => {
+    .description("Execute workspace/plan.json deployment plan in PROD")
+    .action(async (workspace: string, options: { forceUpdate?: boolean }) => {
       const validateSpinner = ora("Preparing ndeploy execution").start();
       let deploySpinner: ReturnType<typeof ora> | null = null;
       try {
         const env = loadEnv();
         validateSpinner.succeed("Environment loaded");
+        const planFilePath = resolveWorkspacePlanFilePath(workspace);
+        logger.info(`[NDEPLOY] workspace=${workspace}`);
         logger.info(`[NDEPLOY] plan_file=${planFilePath}`);
         logger.info(`[NDEPLOY] force_update=${options.forceUpdate === true}`);
         logger.debug(`[NDEPLOY] source=${env.N8N_DEV_URL} target=${env.N8N_PROD_URL}`);

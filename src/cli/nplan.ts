@@ -4,7 +4,12 @@ import { N8nClient } from "../services/N8nClient.js";
 import { PlanService } from "../services/PlanService.js";
 import { loadEnv } from "../utils/env.js";
 import { logger } from "../utils/logger.js";
-import { resolvePlanFileName, writeJsonFile } from "../utils/file.js";
+import {
+  backupWorkspacePlanIfExists,
+  ensureWorkspaceDir,
+  resolveWorkspacePlanFilePath,
+  writeJsonFile,
+} from "../utils/file.js";
 import { ApiError, DependencyError, ValidationError } from "../errors/index.js";
 
 export function registerNPlanCommand(program: Command): void {
@@ -13,13 +18,15 @@ export function registerNPlanCommand(program: Command): void {
   nplan
     .command("flow")
     .argument("<workflow_id_dev>", "Workflow ID in DEV")
-    .description("Generate deployment plan from DEV workflow and dependencies")
-    .action(async (workflowIdDev: string) => {
+    .argument("<workspace>", "Workspace directory")
+    .description("Generate deployment plan in workspace/plan.json from DEV workflow and dependencies")
+    .action(async (workflowIdDev: string, workspace: string) => {
       const spinner = ora("Preparing nplan execution").start();
       try {
         const env = loadEnv();
         spinner.succeed("Environment loaded");
         logger.info(`[NPLAN] root_workflow_id=${workflowIdDev}`);
+        logger.info(`[NPLAN] workspace=${workspace}`);
         logger.debug(`[NPLAN] source=${env.N8N_DEV_URL} target=${env.N8N_PROD_URL}`);
 
         const devClient = new N8nClient(env.N8N_DEV_URL, env.N8N_DEV_API_KEY);
@@ -29,7 +36,12 @@ export function registerNPlanCommand(program: Command): void {
         logger.info("[NPLAN] Starting plan generation pipeline");
         const plan = await service.buildPlan(workflowIdDev);
         logger.info("[NPLAN] Plan generated in memory, writing JSON file");
-        const outputFile = resolvePlanFileName(workflowIdDev);
+        await ensureWorkspaceDir(workspace);
+        const outputFile = resolveWorkspacePlanFilePath(workspace);
+        const backupFile = await backupWorkspacePlanIfExists(workspace);
+        if (backupFile) {
+          logger.info(`[NPLAN] Existing plan backed up to: ${backupFile}`);
+        }
         await writeJsonFile(outputFile, plan);
 
         logger.success("[NPLAN] Plan JSON persisted");

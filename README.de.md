@@ -122,7 +122,24 @@ ndeploy publish <workflow_id_prod>
 
 Manueller Publish-Befehl für Root-Workflow (oder beliebigen Workflow) in PROD.
 
-### 5) Ressourcen löschen
+### 5) Workspace-Info
+
+```bash
+ndeploy info <workspace>
+```
+
+Zeigt den Workspace-Status als JSON:
+- Metadaten aus `workspace.json`
+- Existenz und Kern-Metadaten von `plan.json` / `plan_summary.json`
+- Existenz und Kernzähler von `deploy_result.json` / `deploy_summary.json`
+
+Optional:
+
+```bash
+ndeploy info <workspace> --output <file_path>
+```
+
+### 6) Ressourcen löschen
 
 ```bash
 ndeploy remove --workflows <ids|all> --credentials <ids|all> --data-tables <ids|all>
@@ -147,7 +164,7 @@ ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```
 
-### 6) Orphans finden
+### 7) Orphans finden
 
 ```bash
 ndeploy orphans --side <source|target>
@@ -173,7 +190,7 @@ ndeploy orphans --side source --credentials
 ndeploy orphans --side target --workflows --datatables
 ```
 
-### 7) Dangling References finden
+### 8) Dangling References finden
 
 ```bash
 ndeploy dangling-refs --side <source|target>
@@ -259,7 +276,7 @@ npm run build
 
 ```text
 src/
-  cli/            # plan/apply/publish/remove/orphans/dangling
+  cli/            # create/plan/apply/publish/info/remove/orphans/dangling
   services/       # API, Planung, Deploy, Transformationen
   types/          # Zod-Schemas + TS-Typen
   utils/          # env, logger, hash, file-helpers

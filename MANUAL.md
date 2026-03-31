@@ -103,7 +103,21 @@ Uso típico:
 1. Publicar el root workflow al final del proceso.
 2. Publicar manualmente cualquier workflow específico en PROD.
 
-## 4.5 Eliminar recursos en PROD
+## 4.5 Info del workspace
+
+```bash
+ndeploy info <workspace>
+```
+
+Resultado esperado:
+
+1. Imprime JSON con estado del workspace.
+2. Muestra metadata de `workspace.json`.
+3. Muestra si existen `plan.json`, `plan_summary.json`, `deploy_result.json`, `deploy_summary.json`.
+4. Si los archivos existen, muestra metadata y contadores útiles (por ejemplo `plan_id`, `run_id`, `executed/skipped/failed`).
+5. Con `--output`, también escribe ese JSON en el path indicado.
+
+## 4.6 Eliminar recursos en PROD
 
 ```bash
 ndeploy remove --workflows <ids|all> --credentials <ids|all> --data-tables <ids|all>
@@ -131,7 +145,7 @@ ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```
 
-## 4.6 Detectar huérfanos
+## 4.7 Detectar huérfanos
 
 ```bash
 ndeploy orphans --side <source|target>
@@ -158,7 +172,7 @@ ndeploy orphans --side source --credentials
 ndeploy orphans --side target --workflows --datatables
 ```
 
-## 4.7 Detectar referencias colgantes
+## 4.8 Detectar referencias colgantes
 
 ```bash
 ndeploy dangling-refs --side <source|target>
@@ -387,6 +401,7 @@ ndeploy plan --help
 ndeploy create --help
 ndeploy apply --help
 ndeploy publish --help
+ndeploy info --help
 ndeploy remove --help
 ndeploy orphans --help
 ndeploy dangling-refs --help
@@ -395,6 +410,7 @@ ndeploy dangling-refs --help
 ndeploy create <workflow_id_dev> [workspace_root]
 ndeploy plan <workspace>
 ndeploy apply <workspace>
+ndeploy info <workspace>
 ndeploy publish <workflow_id_prod>
 ndeploy remove --all --yes
 ndeploy orphans --side target

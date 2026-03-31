@@ -122,7 +122,24 @@ ndeploy publish <workflow_id_prod>
 
 Comando manual para publicar el root workflow (u otro workflow) en PROD.
 
-### 5) Eliminar recursos
+### 5) Info del workspace
+
+```bash
+ndeploy info <workspace>
+```
+
+Muestra estado del workspace en JSON:
+- metadata de `workspace.json`
+- presencia y metadata clave de `plan.json` / `plan_summary.json`
+- presencia y contadores clave de `deploy_result.json` / `deploy_summary.json`
+
+Opcional:
+
+```bash
+ndeploy info <workspace> --output <file_path>
+```
+
+### 6) Eliminar recursos
 
 ```bash
 ndeploy remove --workflows <ids|all> --credentials <ids|all> --data-tables <ids|all>
@@ -147,7 +164,7 @@ ndeploy remove --credentials all --data-tables all
 ndeploy remove --all --yes
 ```
 
-### 6) Buscar huérfanos
+### 7) Buscar huérfanos
 
 ```bash
 ndeploy orphans --side <source|target>
@@ -173,7 +190,7 @@ ndeploy orphans --side source --credentials
 ndeploy orphans --side target --workflows --datatables
 ```
 
-### 7) Buscar referencias colgantes
+### 8) Buscar referencias colgantes
 
 ```bash
 ndeploy dangling-refs --side <source|target>
@@ -259,7 +276,7 @@ npm run build
 
 ```text
 src/
-  cli/            # comandos plan/apply/publish/remove/orphans/dangling
+  cli/            # comandos create/plan/apply/publish/info/remove/orphans/dangling
   services/       # API, planificación, deploy, transformaciones
   types/          # schemas Zod + tipos TS
   utils/          # env, logger, hash, helpers de archivos

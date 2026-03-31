@@ -3,6 +3,7 @@ import path from "path";
 
 const PLAN_FILE_NAME = "plan.json";
 const PLAN_SUMMARY_FILE_NAME = "plan_summary.json";
+const PRODUCTION_CREDENTIALS_FILE_NAME = "production_credentials.json";
 const DEPLOY_RESULT_FILE_NAME = "deploy_result.json";
 const DEPLOY_SUMMARY_FILE_NAME = "deploy_summary.json";
 const WORKSPACE_METADATA_FILE_NAME = "workspace.json";
@@ -49,6 +50,10 @@ export function resolveWorkspacePlanFilePath(workspace: string): string {
 
 export function resolveWorkspacePlanSummaryFilePath(workspace: string): string {
   return path.join(resolveWorkspaceDir(workspace), PLAN_SUMMARY_FILE_NAME);
+}
+
+export function resolveWorkspaceProductionCredentialsFilePath(workspace: string): string {
+  return path.join(resolveWorkspaceDir(workspace), PRODUCTION_CREDENTIALS_FILE_NAME);
 }
 
 export function resolveWorkspaceDeployResultFilePath(workspace: string): string {

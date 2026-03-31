@@ -87,6 +87,7 @@ Uses the root workflow configured in `<workspace>/workspace.json`.
 Creates:
 - `<workspace>/plan.json`
 - `<workspace>/plan_summary.json`
+- `<workspace>/production_credentials.json`
 
 If `plan.json` already exists, it's backed up as `plan_backup_<timestamp>.json`.
 
@@ -130,7 +131,7 @@ ndeploy info <workspace>
 
 Shows workspace status in JSON:
 - `workspace.json` metadata
-- `plan.json` / `plan_summary.json` presence and key metadata
+- `plan.json` / `plan_summary.json` / `production_credentials.json` presence and key metadata
 - `deploy_result.json` / `deploy_summary.json` presence and key counters
 
 Optional:
@@ -224,9 +225,10 @@ ndeploy dangling-refs <workspace> --side target --workflows --datatables
 1. `ndeploy create <workflow_id_dev> [workspace_root]`
 2. `ndeploy plan <workspace>`
 3. Review `plan_summary.json` (and `plan.json` if needed).
-4. `ndeploy apply <workspace>`
-5. Review `deploy_summary.json` (and `deploy_result.json` if needed).
-6. Human/manual publish of root workflow:
+4. Review `production_credentials.json` and complete missing PROD credentials.
+5. `ndeploy apply <workspace>`
+6. Review `deploy_summary.json` (and `deploy_result.json` if needed).
+7. Human/manual publish of root workflow:
    - `ndeploy publish <root_workflow_id_prod>`
 
 ## Important Behavior
@@ -236,6 +238,9 @@ ndeploy dangling-refs <workspace> --side target --workflows --datatables
 - Credentials:
   - Missing credentials are created as placeholders (no secrets copied).
   - Placeholder `data` is generated dynamically from credential schema.
+  - `production_credentials.json` always lists all credentials used by the plan and marks:
+    - `EXISTS_IN_PROD` + `KEEP` (do not touch)
+    - `MISSING_IN_PROD` + `CREATE` (must be created/completed in PROD)
 - Data tables:
   - Created/mapped by name.
   - Schema mismatch adds warnings in the plan.

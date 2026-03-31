@@ -8,6 +8,7 @@ import {
   resolveWorkspaceDir,
   resolveWorkspaceMetadataFilePath,
   resolveWorkspacePlanFilePath,
+  resolveWorkspaceProductionCredentialsFilePath,
   resolveWorkspacePlanSummaryFilePath,
   writeJsonFile,
 } from "../utils/file.js";
@@ -46,6 +47,15 @@ interface WorkspaceInfoOutput {
       exists: boolean;
       path: string;
       actions: number | null;
+      plan_id: string | null;
+      generated_at: string | null;
+    };
+    production_credentials: {
+      exists: boolean;
+      path: string;
+      total: number | null;
+      exists_in_prod: number | null;
+      missing_in_prod: number | null;
       plan_id: string | null;
       generated_at: string | null;
     };
@@ -90,12 +100,14 @@ export function registerNInfoCommand(program: Command): void {
       const metadataPath = resolveWorkspaceMetadataFilePath(workspace);
       const planPath = resolveWorkspacePlanFilePath(workspace);
       const planSummaryPath = resolveWorkspacePlanSummaryFilePath(workspace);
+      const productionCredentialsPath = resolveWorkspaceProductionCredentialsFilePath(workspace);
       const deployResultPath = resolveWorkspaceDeployResultFilePath(workspace);
       const deploySummaryPath = resolveWorkspaceDeploySummaryFilePath(workspace);
 
       const metadataExists = await fileExists(metadataPath);
       const planExists = await fileExists(planPath);
       const planSummaryExists = await fileExists(planSummaryPath);
+      const productionCredentialsExists = await fileExists(productionCredentialsPath);
       const deployResultExists = await fileExists(deployResultPath);
       const deploySummaryExists = await fileExists(deploySummaryPath);
 
@@ -105,6 +117,9 @@ export function registerNInfoCommand(program: Command): void {
       const plan = planExists ? await readJsonFile<Record<string, unknown>>(planPath) : null;
       const planSummary = planSummaryExists
         ? await readJsonFile<Record<string, unknown>>(planSummaryPath)
+        : null;
+      const productionCredentials = productionCredentialsExists
+        ? await readJsonFile<Record<string, unknown>>(productionCredentialsPath)
         : null;
       const deployResult = deployResultExists
         ? await readJsonFile<Record<string, unknown>>(deployResultPath)
@@ -143,6 +158,15 @@ export function registerNInfoCommand(program: Command): void {
             actions: getNestedNumber(planSummary, ["totals", "actions"]),
             plan_id: getNestedString(planSummary, ["metadata", "plan_id"]),
             generated_at: getNestedString(planSummary, ["metadata", "generated_at"]),
+          },
+          production_credentials: {
+            exists: productionCredentialsExists,
+            path: productionCredentialsPath,
+            total: getNestedNumber(productionCredentials, ["summary", "total"]),
+            exists_in_prod: getNestedNumber(productionCredentials, ["summary", "exists_in_prod"]),
+            missing_in_prod: getNestedNumber(productionCredentials, ["summary", "missing_in_prod"]),
+            plan_id: getNestedString(productionCredentials, ["metadata", "plan_id"]),
+            generated_at: getNestedString(productionCredentials, ["metadata", "generated_at"]),
           },
           deploy_result: {
             exists: deployResultExists,

@@ -69,8 +69,9 @@ Resultado esperado:
 
 1. Se genera un archivo `<workspace>/plan.json`.
 2. Se genera `<workspace>/plan_summary.json` para vista rápida.
-3. Si ya existe `plan.json`, se renombra a `plan_backup_<timestamp>.json`.
-4. Ese plan contiene acciones para credenciales, data tables y workflows.
+3. Se genera `<workspace>/production_credentials.json` para estado de credenciales en PROD.
+4. Si ya existe `plan.json`, se renombra a `plan_backup_<timestamp>.json`.
+5. Ese plan contiene acciones para credenciales, data tables y workflows.
 
 Importante:
 
@@ -113,7 +114,7 @@ Resultado esperado:
 
 1. Imprime JSON con estado del workspace.
 2. Muestra metadata de `workspace.json`.
-3. Muestra si existen `plan.json`, `plan_summary.json`, `deploy_result.json`, `deploy_summary.json`.
+3. Muestra si existen `plan.json`, `plan_summary.json`, `production_credentials.json`, `deploy_result.json`, `deploy_summary.json`.
 4. Si los archivos existen, muestra metadata y contadores útiles (por ejemplo `plan_id`, `run_id`, `executed/skipped/failed`).
 5. Con `--output`, también escribe ese JSON en el path indicado.
 
@@ -220,15 +221,17 @@ ndeploy plan <workspace_generado>
 
 4. Revisar `plan_summary.json` (y `plan.json` si necesitas detalle total).
 
-5. Aplicar el plan:
+5. Revisar `production_credentials.json` y completar las credenciales faltantes en PROD.
+
+6. Aplicar el plan:
 
 ```bash
 ndeploy apply <workspace_generado>
 ```
 
-6. Revisar `deploy_summary.json` (y `deploy_result.json` si necesitas auditoría completa).
+7. Revisar `deploy_summary.json` (y `deploy_result.json` si necesitas auditoría completa).
 
-7. Publicar root manualmente:
+8. Publicar root manualmente:
 
 ```bash
 ndeploy publish <root_workflow_id_en_prod>

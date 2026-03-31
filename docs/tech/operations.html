@@ -37,7 +37,8 @@
       <ol>
         <li>Create workspace from DEV workflow id.</li>
         <li>Generate a fresh plan in that workspace.</li>
-        <li>Inspect <code>plan_summary.json</code> and warnings for schema/mapping concerns.</li>
+        <li>Inspect <code>plan_summary.json</code> and <code>production_credentials.json</code>.</li>
+        <li>Complete missing PROD credentials marked as <code>MISSING_IN_PROD</code>.</li>
         <li>Apply plan with normal mode first.</li>
         <li>Inspect <code>deploy_summary.json</code> for executed/skipped/failed actions.</li>
         <li>Publish root workflow explicitly when post-apply checks pass.</li>

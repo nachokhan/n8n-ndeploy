@@ -87,6 +87,7 @@ Verwendet den in `<workspace>/workspace.json` konfigurierten Root-Workflow.
 Erzeugt:
 - `<workspace>/plan.json`
 - `<workspace>/plan_summary.json`
+- `<workspace>/production_credentials.json`
 
 Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp>.json` erstellt.
 
@@ -130,7 +131,7 @@ ndeploy info <workspace>
 
 Zeigt den Workspace-Status als JSON:
 - Metadaten aus `workspace.json`
-- Existenz und Kern-Metadaten von `plan.json` / `plan_summary.json`
+- Existenz und Kern-Metadaten von `plan.json` / `plan_summary.json` / `production_credentials.json`
 - Existenz und Kernzähler von `deploy_result.json` / `deploy_summary.json`
 
 Optional:
@@ -224,9 +225,10 @@ ndeploy dangling-refs <workspace> --side target --workflows --datatables
 1. `ndeploy create <workflow_id_dev> [workspace_root]`
 2. `ndeploy plan <workspace>`
 3. `plan_summary.json` prüfen (optional auch `plan.json`).
-4. `ndeploy apply <workspace>`
-5. `deploy_summary.json` prüfen (optional auch `deploy_result.json`).
-6. Root-Workflow manuell veröffentlichen:
+4. `production_credentials.json` prüfen und fehlende PROD-Credentials ergänzen.
+5. `ndeploy apply <workspace>`
+6. `deploy_summary.json` prüfen (optional auch `deploy_result.json`).
+7. Root-Workflow manuell veröffentlichen:
    - `ndeploy publish <root_workflow_id_prod>`
 
 ## Wichtige Hinweise
@@ -236,6 +238,9 @@ ndeploy dangling-refs <workspace> --side target --workflows --datatables
 - Credentials:
   - Fehlende Credentials werden als Platzhalter erstellt (ohne Secrets).
   - Platzhalter-`data` wird dynamisch aus dem Credential-Schema erzeugt.
+  - `production_credentials.json` listet immer alle im Plan verwendeten Credentials und markiert:
+    - `EXISTS_IN_PROD` + `KEEP` (nicht anfassen)
+    - `MISSING_IN_PROD` + `CREATE` (in PROD erstellen/vervollständigen)
 - Data Tables:
   - Erstellung/Mapping über Namen.
   - Schema-Unterschiede erzeugen Warnings im Plan.

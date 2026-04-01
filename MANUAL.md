@@ -68,7 +68,7 @@ ndeploy plan <workspace>
 Resultado esperado:
 
 1. Se genera un archivo `<workspace>/plan.json`.
-2. Se genera `<workspace>/plan_summary.json` para vista rápida.
+2. Se genera `<workspace>/reports/plan_summary.json` para vista rápida.
 3. Se genera `<workspace>/production_credentials.json` para estado de credenciales en PROD, incluyendo template editable por credencial (`required_fields`, `fields`, `data`).
 4. Si ya existe `plan.json`, se renombra a `plan_backup_<timestamp>.json`.
 5. Ese plan contiene acciones para credenciales, data tables y workflows.
@@ -89,8 +89,8 @@ Resultado esperado:
 1. Ejecuta las acciones del plan en PROD.
 2. Auto-publica subworkflows cuando corresponde.
 3. No auto-publica el root workflow.
-4. Genera `<workspace>/deploy_result.json` (resultado completo).
-5. Genera `<workspace>/deploy_summary.json` (vista rápida).
+4. Genera `<workspace>/reports/deploy_result.json` (resultado completo).
+5. Genera `<workspace>/reports/deploy_summary.json` (vista rápida).
 6. Si falla en mitad del deploy, igualmente escribe resultados parciales.
 
 ## 4.4 Publicar manualmente
@@ -114,7 +114,7 @@ Resultado esperado:
 
 1. Imprime JSON con estado del workspace.
 2. Muestra metadata de `workspace.json`.
-3. Muestra si existen `plan.json`, `plan_summary.json`, `production_credentials.json`, `deploy_result.json`, `deploy_summary.json`.
+3. Muestra si existen `plan.json`, `reports/plan_summary.json`, `production_credentials.json`, `reports/deploy_result.json`, `reports/deploy_summary.json`.
 4. Si los archivos existen, muestra metadata y contadores útiles (por ejemplo `plan_id`, `run_id`, `executed/skipped/failed`).
 5. Con `--output`, también escribe ese JSON en el path indicado.
 
@@ -159,7 +159,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros de entidad, se asume `--all`.
 5. Los workflows archivados se consideran borrados y no cuentan para referencias.
-6. Si no pasas `--output`, guarda en `<workspace>/orphans_<side>.json`.
+6. Si no pasas `--output`, guarda en `<workspace>/reports/orphans_<side>.json`.
 
 Salida:
 
@@ -187,7 +187,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros, se asume `--all`.
 5. Solo se analizan workflows no archivados.
-6. Si no pasas `--output`, guarda en `<workspace>/dangling_<side>.json`.
+6. Si no pasas `--output`, guarda en `<workspace>/reports/dangling_<side>.json`.
 
 Salida:
 
@@ -243,7 +243,7 @@ ndeploy create YI2AqhHvG8gfsyM2 tmp
 ndeploy plan <workspace_generado>
 ```
 
-4. Revisar `plan_summary.json` (y `plan.json` si necesitas detalle total).
+4. Revisar `reports/plan_summary.json` (y `plan.json` si necesitas detalle total).
 
 5. Revisar `production_credentials.json` y completar las credenciales faltantes en PROD.
 
@@ -259,7 +259,7 @@ ndeploy credentials validate <workspace_generado> --strict
 ndeploy apply <workspace_generado>
 ```
 
-8. Revisar `deploy_summary.json` (y `deploy_result.json` si necesitas auditoría completa).
+8. Revisar `reports/deploy_summary.json` (y `reports/deploy_result.json` si necesitas auditoría completa).
 
 9. Publicar root manualmente:
 

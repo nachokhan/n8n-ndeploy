@@ -40,7 +40,7 @@
       </p>
       <ul>
         <li><code>plan.json</code>: full plan with metadata and ordered actions.</li>
-        <li><code>plan_summary.json</code>: compact summary for fast operator review.</li>
+        <li><code>reports/plan_summary.json</code>: compact summary for fast operator review.</li>
         <li><code>production_credentials.json</code>: credential inventory with explicit PROD status (<code>EXISTS_IN_PROD</code> vs <code>MISSING_IN_PROD</code>) and editable credential templates.</li>
         <li>Metadata: source/target instances, root workflow id, generation timestamp.</li>
         <li>Action list for credentials, data tables, and workflows.</li>
@@ -94,7 +94,7 @@
         <li>Validate DEV freshness for workflow payloads.</li>
         <li>Execute actions in dependency-safe order.</li>
         <li>Patch references with resolved ID mappings before workflow writes.</li>
-        <li>Write <code>deploy_result.json</code> and <code>deploy_summary.json</code> in the workspace.</li>
+        <li>Write <code>reports/deploy_result.json</code> and <code>reports/deploy_summary.json</code> in the workspace.</li>
       </ol>
 
       <p>

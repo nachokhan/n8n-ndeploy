@@ -86,8 +86,8 @@ ndeploy plan <workspace>
 Usa el workflow root configurado en `<workspace>/workspace.json`.
 Genera:
 - `<workspace>/plan.json`
-- `<workspace>/plan_summary.json`
 - `<workspace>/production_credentials.json`
+- `<workspace>/reports/plan_summary.json`
 
 Si `plan.json` ya existe, hace backup como `plan_backup_<timestamp>.json`.
 
@@ -104,8 +104,8 @@ ndeploy apply <workspace>
 
 Ejecuta el plan en PROD (credenciales, data tables, workflows).
 Genera:
-- `<workspace>/deploy_result.json`
-- `<workspace>/deploy_summary.json`
+- `<workspace>/reports/deploy_result.json`
+- `<workspace>/reports/deploy_summary.json`
 
 Si el deploy falla a mitad de ejecución, igual se escriben resultados parciales.
 
@@ -131,8 +131,8 @@ ndeploy info <workspace>
 
 Muestra estado del workspace en JSON:
 - metadata de `workspace.json`
-- presencia y metadata clave de `plan.json` / `plan_summary.json` / `production_credentials.json`
-- presencia y contadores clave de `deploy_result.json` / `deploy_summary.json`
+- presencia y metadata clave de `plan.json` / `reports/plan_summary.json` / `production_credentials.json`
+- presencia y contadores clave de `reports/deploy_result.json` / `reports/deploy_summary.json`
 
 Opcional:
 
@@ -182,7 +182,7 @@ Enumera entidades no referenciadas por ningún workflow no archivado y devuelve 
   - `--data-tables` (alias: `--datatables`)
   - `--all`
 - Si no pasas filtros de entidad, se asume `--all`.
-- Archivo de salida por defecto (si no pasas `--output`): `<workspace>/orphans_<side>.json`
+- Archivo de salida por defecto (si no pasas `--output`): `<workspace>/reports/orphans_<side>.json`
 
 Ejemplos:
 
@@ -210,7 +210,7 @@ Enumera workflows que referencian entidades que ya no existen.
   - `--all`
 - Si no pasas filtros, se asume `--all`.
 - Alias del comando: `ndeploy dangling`
-- Archivo de salida por defecto (si no pasas `--output`): `<workspace>/dangling_<side>.json`
+- Archivo de salida por defecto (si no pasas `--output`): `<workspace>/reports/dangling_<side>.json`
 
 Ejemplos:
 
@@ -243,11 +243,11 @@ ndeploy credentials validate <workspace> --strict
 
 1. `ndeploy create <workflow_id_dev> [workspace_root]`
 2. `ndeploy plan <workspace>`
-3. Revisar `plan_summary.json` (y `plan.json` si hace falta).
+3. Revisar `reports/plan_summary.json` (y `plan.json` si hace falta).
 4. Revisar `production_credentials.json` y completar credenciales faltantes en PROD.
 5. Validar credenciales: `ndeploy credentials validate <workspace> --strict`
 6. `ndeploy apply <workspace>`
-7. Revisar `deploy_summary.json` (y `deploy_result.json` si hace falta).
+7. Revisar `reports/deploy_summary.json` (y `reports/deploy_result.json` si hace falta).
 8. Publicación manual del root workflow:
    - `ndeploy publish <root_workflow_id_prod>`
 

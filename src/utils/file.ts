@@ -6,6 +6,7 @@ const PLAN_SUMMARY_FILE_NAME = "plan_summary.json";
 const PRODUCTION_CREDENTIALS_FILE_NAME = "production_credentials.json";
 const DEPLOY_RESULT_FILE_NAME = "deploy_result.json";
 const DEPLOY_SUMMARY_FILE_NAME = "deploy_summary.json";
+const REPORTS_DIR_NAME = "reports";
 const WORKSPACE_METADATA_FILE_NAME = "workspace.json";
 
 export interface WorkspaceMetadata {
@@ -48,8 +49,12 @@ export function resolveWorkspacePlanFilePath(workspace: string): string {
   return path.join(resolveWorkspaceDir(workspace), PLAN_FILE_NAME);
 }
 
+export function resolveWorkspaceReportsDir(workspace: string): string {
+  return path.join(resolveWorkspaceDir(workspace), REPORTS_DIR_NAME);
+}
+
 export function resolveWorkspacePlanSummaryFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), PLAN_SUMMARY_FILE_NAME);
+  return path.join(resolveWorkspaceReportsDir(workspace), PLAN_SUMMARY_FILE_NAME);
 }
 
 export function resolveWorkspaceProductionCredentialsFilePath(workspace: string): string {
@@ -57,11 +62,19 @@ export function resolveWorkspaceProductionCredentialsFilePath(workspace: string)
 }
 
 export function resolveWorkspaceDeployResultFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), DEPLOY_RESULT_FILE_NAME);
+  return path.join(resolveWorkspaceReportsDir(workspace), DEPLOY_RESULT_FILE_NAME);
 }
 
 export function resolveWorkspaceDeploySummaryFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), DEPLOY_SUMMARY_FILE_NAME);
+  return path.join(resolveWorkspaceReportsDir(workspace), DEPLOY_SUMMARY_FILE_NAME);
+}
+
+export function resolveWorkspaceOrphansFilePath(workspace: string, side: "source" | "target"): string {
+  return path.join(resolveWorkspaceReportsDir(workspace), `orphans_${side}.json`);
+}
+
+export function resolveWorkspaceDanglingFilePath(workspace: string, side: "source" | "target"): string {
+  return path.join(resolveWorkspaceReportsDir(workspace), `dangling_${side}.json`);
 }
 
 export function resolveWorkspaceMetadataFilePath(workspace: string): string {

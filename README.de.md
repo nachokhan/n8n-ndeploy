@@ -86,8 +86,8 @@ ndeploy plan <workspace>
 Verwendet den in `<workspace>/workspace.json` konfigurierten Root-Workflow.
 Erzeugt:
 - `<workspace>/plan.json`
-- `<workspace>/plan_summary.json`
 - `<workspace>/production_credentials.json`
+- `<workspace>/reports/plan_summary.json`
 
 Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp>.json` erstellt.
 
@@ -104,8 +104,8 @@ ndeploy apply <workspace>
 
 Führt den Plan in PROD aus (Credentials, Data Tables, Workflows).
 Schreibt:
-- `<workspace>/deploy_result.json`
-- `<workspace>/deploy_summary.json`
+- `<workspace>/reports/deploy_result.json`
+- `<workspace>/reports/deploy_summary.json`
 
 Wenn das Deployment mitten im Lauf fehlschlägt, werden trotzdem partielle Ergebnisdateien geschrieben.
 
@@ -131,8 +131,8 @@ ndeploy info <workspace>
 
 Zeigt den Workspace-Status als JSON:
 - Metadaten aus `workspace.json`
-- Existenz und Kern-Metadaten von `plan.json` / `plan_summary.json` / `production_credentials.json`
-- Existenz und Kernzähler von `deploy_result.json` / `deploy_summary.json`
+- Existenz und Kern-Metadaten von `plan.json` / `reports/plan_summary.json` / `production_credentials.json`
+- Existenz und Kernzähler von `reports/deploy_result.json` / `reports/deploy_summary.json`
 
 Optional:
 
@@ -182,7 +182,7 @@ Listet Entitäten auf, die von keinem nicht-archivierten Workflow referenziert w
   - `--data-tables` (Alias: `--datatables`)
   - `--all`
 - Ohne Entitätsfilter wird automatisch `--all` verwendet.
-- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/orphans_<side>.json`
+- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/reports/orphans_<side>.json`
 
 Beispiele:
 
@@ -210,7 +210,7 @@ Listet Workflows auf, die Entitäten referenzieren, die nicht mehr existieren.
   - `--all`
 - Ohne Filter wird automatisch `--all` verwendet.
 - Alias-Befehl: `ndeploy dangling`
-- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/dangling_<side>.json`
+- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/reports/dangling_<side>.json`
 
 Beispiele:
 
@@ -224,10 +224,10 @@ ndeploy dangling-refs <workspace> --side target --workflows --datatables
 
 1. `ndeploy create <workflow_id_dev> [workspace_root]`
 2. `ndeploy plan <workspace>`
-3. `plan_summary.json` prüfen (optional auch `plan.json`).
+3. `reports/plan_summary.json` prüfen (optional auch `plan.json`).
 4. `production_credentials.json` prüfen und fehlende PROD-Credentials ergänzen.
 5. `ndeploy apply <workspace>`
-6. `deploy_summary.json` prüfen (optional auch `deploy_result.json`).
+6. `reports/deploy_summary.json` prüfen (optional auch `reports/deploy_result.json`).
 7. Root-Workflow manuell veröffentlichen:
    - `ndeploy publish <root_workflow_id_prod>`
 

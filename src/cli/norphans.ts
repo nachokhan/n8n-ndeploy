@@ -3,7 +3,12 @@ import path from "path";
 import { Command } from "commander";
 import { N8nClient, WorkflowSummaryItem } from "../services/N8nClient.js";
 import { loadEnv } from "../utils/env.js";
-import { fileExists, resolveWorkspaceDir, writeJsonFile } from "../utils/file.js";
+import {
+  fileExists,
+  resolveWorkspaceDir,
+  resolveWorkspaceOrphansFilePath,
+  writeJsonFile,
+} from "../utils/file.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError } from "../errors/index.js";
 
@@ -138,7 +143,7 @@ export function registerNOrphansCommand(program: Command): void {
         }
 
         spinner.succeed("Orphan analysis completed");
-        const outputPath = resolveOutputPath(options.output, workspaceDir, side, "orphans");
+        const outputPath = resolveOutputPath(options.output, workspace, side);
         await writeResultFile(outputPath, response, "NORPHANS");
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
@@ -163,14 +168,13 @@ async function writeResultFile(
 
 function resolveOutputPath(
   outputPath: string | undefined,
-  workspaceDir: string,
+  workspace: string,
   side: Side,
-  baseName: "orphans" | "dangling",
 ): string {
   if (outputPath) {
     return path.resolve(process.cwd(), outputPath);
   }
-  return path.join(workspaceDir, `${baseName}_${side}.json`);
+  return resolveWorkspaceOrphansFilePath(workspace, side);
 }
 
 function parseSide(value: string | undefined): Side {

@@ -86,8 +86,8 @@ ndeploy plan <workspace>
 Uses the root workflow configured in `<workspace>/workspace.json`.
 Creates:
 - `<workspace>/plan.json`
-- `<workspace>/plan_summary.json`
 - `<workspace>/production_credentials.json`
+- `<workspace>/reports/plan_summary.json`
 
 If `plan.json` already exists, it's backed up as `plan_backup_<timestamp>.json`.
 
@@ -104,8 +104,8 @@ ndeploy apply <workspace>
 
 Executes the plan in PROD (credentials, data tables, workflows).
 Writes:
-- `<workspace>/deploy_result.json`
-- `<workspace>/deploy_summary.json`
+- `<workspace>/reports/deploy_result.json`
+- `<workspace>/reports/deploy_summary.json`
 
 If deployment fails mid-run, partial result files are still written.
 
@@ -131,8 +131,8 @@ ndeploy info <workspace>
 
 Shows workspace status in JSON:
 - `workspace.json` metadata
-- `plan.json` / `plan_summary.json` / `production_credentials.json` presence and key metadata
-- `deploy_result.json` / `deploy_summary.json` presence and key counters
+- `plan.json` / `reports/plan_summary.json` / `production_credentials.json` presence and key metadata
+- `reports/deploy_result.json` / `reports/deploy_summary.json` presence and key counters
 
 Optional:
 
@@ -182,7 +182,7 @@ Lists entities not referenced by any non-archived workflow and prints pretty JSO
   - `--data-tables` (alias: `--datatables`)
   - `--all`
 - If no entity filter is provided, it defaults to `--all`.
-- Default output file (if `--output` is omitted): `<workspace>/orphans_<side>.json`
+- Default output file (if `--output` is omitted): `<workspace>/reports/orphans_<side>.json`
 
 Examples:
 
@@ -210,7 +210,7 @@ Lists workflows that reference entities which no longer exist.
   - `--all`
 - If no reference filter is provided, it defaults to `--all`.
 - Alias command: `ndeploy dangling`
-- Default output file (if `--output` is omitted): `<workspace>/dangling_<side>.json`
+- Default output file (if `--output` is omitted): `<workspace>/reports/dangling_<side>.json`
 
 Examples:
 
@@ -243,11 +243,11 @@ ndeploy credentials validate <workspace> --strict
 
 1. `ndeploy create <workflow_id_dev> [workspace_root]`
 2. `ndeploy plan <workspace>`
-3. Review `plan_summary.json` (and `plan.json` if needed).
+3. Review `reports/plan_summary.json` (and `plan.json` if needed).
 4. Review `production_credentials.json` and complete missing PROD credentials.
 5. Validate credentials: `ndeploy credentials validate <workspace> --strict`
 6. `ndeploy apply <workspace>`
-7. Review `deploy_summary.json` (and `deploy_result.json` if needed).
+7. Review `reports/deploy_summary.json` (and `reports/deploy_result.json` if needed).
 8. Human/manual publish of root workflow:
    - `ndeploy publish <root_workflow_id_prod>`
 

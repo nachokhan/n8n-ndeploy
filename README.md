@@ -6,6 +6,86 @@
 
 Deterministic, idempotent TypeScript CLI to plan and apply **n8n** workflow deployments from **DEV -> PROD**.
 
+## Installation Guide
+
+This is the fastest way to get `ndeploy` running for any user on macOS, Linux, or Ubuntu servers.
+
+### 1) Requirements
+
+- Node.js `>= 18`
+- npm
+- API access to DEV and PROD n8n instances
+
+Check your Node version:
+
+```bash
+node -v
+```
+
+### 2) Fresh Install
+
+Clone the repository, install dependencies, build the CLI, and link it globally:
+
+```bash
+git clone https://github.com/nachokhan/n8n-ndeploy.git ndeploy
+cd n8n-ndeploy
+npm install
+npm run build
+chmod +x dist/index.js
+sudo npm link
+ndeploy --help
+```
+
+If `ndeploy --help` prints the command list, the CLI is ready to use.
+
+### 3) Update an Existing Install
+
+If the project is already installed on a server, update it like this:
+
+```bash
+cd /your/ndeploy/folder
+git pull
+npm run build
+chmod +x dist/index.js
+sudo npm link
+ndeploy --help
+```
+
+This is enough after pulling new changes, even on Ubuntu, as long as the server is running Node.js 18 or newer.
+
+### 4) Configure Environment Variables
+
+Create `.env` (or copy from `.env.example`):
+
+```env
+N8N_DEV_URL=http://localhost:5678
+N8N_DEV_API_KEY=dev_api_key
+N8N_PROD_URL=http://localhost:5679
+N8N_PROD_API_KEY=prod_api_key
+# Optional fallback for credentials fill:
+# N8N webhook endpoint that returns credential data by requested ids
+N8N_DEV_CREDENTIAL_EXPORT_URL=
+# Bearer token for that endpoint
+N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
+# Optional fallback when using `ndeploy credentials update --fill --side target`
+N8N_PROD_CREDENTIAL_EXPORT_URL=
+N8N_PROD_CREDENTIAL_EXPORT_TOKEN=
+```
+
+### 5) First Smoke Test
+
+Run:
+
+```bash
+ndeploy --help
+```
+
+Then you can start with:
+
+```bash
+ndeploy create <workflow_id_dev> [workspace_root]
+```
+
 ## Did this app help you?
 If this app was useful to you, you can buy me a flat white or expresso as a thank you.
 
@@ -28,46 +108,6 @@ If this app was useful to you, you can buy me a flat white or expresso as a than
 - Patches internal workflow references without global string replacements.
 - Auto-publishes sub-workflows when needed.
 - Never auto-publishes the root workflow (manual human action only).
-
-## Requirements
-
-- Node.js `>= 18`
-- npm
-- API access to DEV and PROD n8n instances
-
-## Installation
-
-```bash
-npm install
-npm run build
-```
-
-To run it as a direct command (without `npm run`):
-
-```bash
-npm link
-```
-
-Then use `ndeploy ...` directly.
-
-## Configuration
-
-Create `.env` (or copy from `.env.example`):
-
-```env
-N8N_DEV_URL=http://localhost:5678
-N8N_DEV_API_KEY=dev_api_key
-N8N_PROD_URL=http://localhost:5679
-N8N_PROD_API_KEY=prod_api_key
-# Optional fallback for credentials fill:
-# N8N webhook endpoint that returns credential data by requested ids
-N8N_DEV_CREDENTIAL_EXPORT_URL=
-# Bearer token for that endpoint
-N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
-# Optional fallback when using `ndeploy credentials update --fill --side target`
-N8N_PROD_CREDENTIAL_EXPORT_URL=
-N8N_PROD_CREDENTIAL_EXPORT_TOKEN=
-```
 
 ## At a Glance
 

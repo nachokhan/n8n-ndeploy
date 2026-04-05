@@ -22,7 +22,7 @@
       </nav>
       <div class="footer-links">
         <a href="../index.html">Main site</a>
-        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/nachokhan/n8n-ndeploy" target="_blank" rel="noopener">GitHub</a>
       </div>
     </aside>
 
@@ -67,8 +67,8 @@
             </tr>
             <tr>
               <td>Credential Handling</td>
-              <td>Credentials are mapped by name or created as placeholders.</td>
-              <td>Secret values are not copied across environments.</td>
+              <td>Credentials are managed through <code>production_credentials.json</code>, with optional fill from source or target.</td>
+              <td>Operators still review and validate template data before apply.</td>
             </tr>
             <tr>
               <td>Idempotence</td>
@@ -89,7 +89,8 @@
         <li>Create workspace: <code>ndeploy create &lt;workflow_id_dev&gt; [workspace_root]</code></li>
         <li>Generate plan: <code>ndeploy plan &lt;workspace&gt;</code></li>
         <li>Review <code>reports/plan_summary.json</code> (plus <code>plan.json</code> if needed).</li>
-        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill</code> and review <code>production_credentials.json</code>.</li>
+        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
+        <li>Run <code>ndeploy credentials validate &lt;workspace&gt; --strict</code> before apply.</li>
         <li>Apply plan: <code>ndeploy apply &lt;workspace&gt;</code></li>
         <li>Review <code>reports/deploy_summary.json</code> (and <code>reports/deploy_result.json</code> if needed).</li>
         <li>Publish root workflow manually when release criteria are met.</li>

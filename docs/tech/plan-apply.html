@@ -22,7 +22,7 @@
       </nav>
       <div class="footer-links">
         <a href="../index.html">Main site</a>
-        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/nachokhan/n8n-ndeploy" target="_blank" rel="noopener">GitHub</a>
       </div>
     </aside>
 
@@ -47,8 +47,9 @@
         <li>Workflow payload snapshots and DEV freshness checksums.</li>
       </ul>
       <p>
-        Credential manifests are managed separately with <code>ndeploy credentials update &lt;workspace&gt; [--fill]</code>,
-        which creates or updates <code>production_credentials.json</code>.
+        Credential manifests are managed separately with <code>ndeploy credentials update &lt;workspace&gt; [--fill] [--side source|target]</code>,
+        which creates or updates <code>production_credentials.json</code>. Use
+        <code>ndeploy credentials validate &lt;workspace&gt; --strict</code> before apply to confirm required fields are ready.
       </p>
 
       <h3>Action Semantics</h3>
@@ -70,7 +71,7 @@
             <tr>
               <td>Credential</td>
               <td><code>CREATE</code></td>
-              <td>Missing in PROD; create placeholder without secrets.</td>
+              <td>Missing in PROD; create a production credential template entry for operator review.</td>
             </tr>
             <tr>
               <td>Data Table</td>
@@ -95,6 +96,7 @@
         <li>Validate plan schema.</li>
         <li>Validate root action existence.</li>
         <li>Validate DEV freshness for workflow payloads.</li>
+        <li>Load reviewed credential manifest values from <code>production_credentials.json</code>.</li>
         <li>Execute actions in dependency-safe order.</li>
         <li>Patch references with resolved ID mappings before workflow writes.</li>
         <li>Write <code>reports/deploy_result.json</code> and <code>reports/deploy_summary.json</code> in the workspace.</li>

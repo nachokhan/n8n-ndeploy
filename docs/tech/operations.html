@@ -22,7 +22,7 @@
       </nav>
       <div class="footer-links">
         <a href="../index.html">Main site</a>
-        <a href="https://github.com/nachokhan/ndeploy" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/nachokhan/n8n-ndeploy" target="_blank" rel="noopener">GitHub</a>
       </div>
     </aside>
 
@@ -38,8 +38,9 @@
         <li>Create workspace from DEV workflow id.</li>
         <li>Generate a fresh plan in that workspace.</li>
         <li>Inspect <code>reports/plan_summary.json</code>.</li>
-        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill</code> and review <code>production_credentials.json</code>.</li>
-        <li>Complete required PROD credential values in each active entry's <code>template.data</code>.</li>
+        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
+        <li>Complete or adjust required PROD credential values in each active entry's <code>template.data</code>.</li>
+        <li>Run <code>ndeploy credentials validate &lt;workspace&gt; --strict</code>.</li>
         <li>Apply plan with normal mode first.</li>
         <li>Inspect <code>reports/deploy_summary.json</code> for executed/skipped/failed actions.</li>
         <li>Publish root workflow explicitly when post-apply checks pass.</li>
@@ -97,12 +98,15 @@
 
       <h3>Credential-related failures after apply</h3>
       <p>
-        Verify placeholder credentials were completed with real secrets in PROD.
+        Verify <code>production_credentials.json</code> contains the intended values, rerun <code>credentials validate --strict</code>,
+        and confirm whether your fill source should have been <code>source</code>, <code>target</code>, or the n8n export fallback endpoint.
       </p>
 
       <h2>Command Set for Daily Ops</h2>
       <pre><code>ndeploy create &lt;workflow_id_dev&gt; [workspace_root]
 ndeploy plan &lt;workspace&gt;
+ndeploy credentials update &lt;workspace&gt; --fill --side source
+ndeploy credentials validate &lt;workspace&gt; --strict
 ndeploy apply &lt;workspace&gt;
 ndeploy info &lt;workspace&gt;
 ndeploy publish &lt;workflow_id_prod&gt;

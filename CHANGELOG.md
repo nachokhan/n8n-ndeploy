@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 The format follows Keep a Changelog and Semantic Versioning.
 
+## [2.0.0] - 2026-04-05
+### Added
+- New workspace-first flow with `ndeploy create`, `ndeploy info`, `plan_summary.json`, `deploy_summary.json`, and `deploy_result.json`.
+- New credential management workflow with `ndeploy credentials update` and `ndeploy credentials validate`.
+- Editable `production_credentials.json` templates with PROD existence status and schema-aware field templates.
+- Optional credential fill support from DEV or PROD using `--fill --side <source|target>`.
+- Included generic n8n webhook fallback template and instructions under `n8n/` for credential export recovery.
+
+### Changed
+- Planning and deployment now operate around a persisted workspace model instead of the previous direct plan flow.
+- Generated reports moved under `workspace/report` and operator docs were refreshed across README, MANUAL, and site docs.
+- CLI compatibility improved by pinning `ora` to v5 for Node 18 CommonJS environments.
+
+### Fixed
+- Credential fill can now fall back to an n8n endpoint when the standard API does not expose decrypted credential data.
+
 ## [1.4.0] - 2026-03-17
 ### Added
 - New `--archived-workflows` filter in `ndeploy remove` to target archived workflows.

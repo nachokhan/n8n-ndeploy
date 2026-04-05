@@ -59,6 +59,11 @@ N8N_DEV_URL=http://localhost:5678
 N8N_DEV_API_KEY=dev_api_key
 N8N_PROD_URL=http://localhost:5679
 N8N_PROD_API_KEY=prod_api_key
+# Fallback opcional para completar credenciales:
+# Endpoint webhook de n8n que devuelve data por ids solicitados
+N8N_DEV_CREDENTIAL_EXPORT_URL=
+# Token Bearer para ese endpoint
+N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
 ```
 
 ## Vista rápida
@@ -235,6 +240,9 @@ Crea o actualiza `<workspace>/production_credentials.json` desde las credenciale
   - mueve a `archived_credentials` las que ya no se usan.
   - no modifica las credenciales activas ya existentes (salvo sincronizar `name` por `dev_id`).
   - `--fill` aplica solo a credenciales nuevas.
+- Orden de fuentes cuando usas `--fill`:
+  - Primero API pública de DEV.
+  - Fallback opcional a webhook (`N8N_DEV_CREDENTIAL_EXPORT_URL` + `N8N_DEV_CREDENTIAL_EXPORT_TOKEN`) para las credenciales que sigan sin data.
 
 Opcional:
 

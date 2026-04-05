@@ -29,6 +29,9 @@ N8N_DEV_URL=https://tu-dev
 N8N_DEV_API_KEY=xxxxx
 N8N_PROD_URL=https://tu-prod
 N8N_PROD_API_KEY=yyyyy
+# Fallback opcional para `credentials update --fill`
+N8N_DEV_CREDENTIAL_EXPORT_URL=
+N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
 ```
 
 ## 3. Instalación para uso directo
@@ -220,6 +223,9 @@ Reglas:
    - no modifica entradas activas ya existentes (excepto sincronizar `name` por `dev_id`).
    - con `--fill`, completa solo las nuevas.
 4. Siempre mantiene los campos `active_credentials` y `archived_credentials`.
+5. Si usas `--fill`, el orden de llenado es:
+   - primero API pública de DEV;
+   - luego fallback opcional a webhook (si `N8N_DEV_CREDENTIAL_EXPORT_URL` y `N8N_DEV_CREDENTIAL_EXPORT_TOKEN` están configurados).
 
 Ejemplos:
 

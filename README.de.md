@@ -59,6 +59,11 @@ N8N_DEV_URL=http://localhost:5678
 N8N_DEV_API_KEY=dev_api_key
 N8N_PROD_URL=http://localhost:5679
 N8N_PROD_API_KEY=prod_api_key
+# Optionaler Fallback für Credential-Fill:
+# n8n-Webhook-Endpunkt, der Credential-Daten anhand angeforderter IDs zurückgibt
+N8N_DEV_CREDENTIAL_EXPORT_URL=
+# Bearer-Token für diesen Endpunkt
+N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
 ```
 
 ## Schnellüberblick
@@ -235,6 +240,9 @@ Erstellt oder aktualisiert `<workspace>/production_credentials.json` aus DEV-Abh
   - nicht mehr verwendete Credentials werden nach `archived_credentials` verschoben.
   - bestehende aktive Einträge bleiben unverändert (außer Namensabgleich per `dev_id`).
   - `--fill` gilt nur für neu hinzugefügte Credentials.
+- Reihenfolge der Fill-Quellen bei `--fill`:
+  - zuerst DEV Public API.
+  - optionaler Webhook-Fallback (`N8N_DEV_CREDENTIAL_EXPORT_URL` + `N8N_DEV_CREDENTIAL_EXPORT_TOKEN`) für weiterhin ungelöste Credentials.
 
 Optional:
 

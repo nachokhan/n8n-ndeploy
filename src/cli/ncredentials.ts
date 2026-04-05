@@ -1,8 +1,9 @@
 import path from "path";
+import axios from "axios";
 import { Command } from "commander";
 import { N8nClient } from "../services/N8nClient.js";
 import { ValidationError } from "../errors/index.js";
-import { loadEnv } from "../utils/env.js";
+import { AppEnv, loadEnv } from "../utils/env.js";
 import {
   WorkspaceMetadata,
   fileExists,
@@ -20,6 +21,12 @@ import {
 
 interface CredentialsUpdateOptions {
   fill?: boolean;
+}
+
+interface CredentialFillCandidate {
+  id: string;
+  name: string;
+  type: string | null;
 }
 
 interface CredentialsValidateOptions {
@@ -84,6 +91,18 @@ export function registerNCredentialsCommand(program: Command): void {
       const devClient = new N8nClient(env.N8N_DEV_URL, env.N8N_DEV_API_KEY);
       const discovery = await discoverCredentialDependencies(devClient, rootWorkflowId);
       const credentialIds = [...discovery.credentialIds].sort((a, b) => a.localeCompare(b));
+      const devCredentialById = new Map<
+        string,
+        { id: string; name: string; type: string | null }
+      >();
+      for (const credentialId of credentialIds) {
+        const credential = await devClient.getCredentialById(credentialId);
+        devCredentialById.set(credentialId, {
+          id: credential.id,
+          name: credential.name,
+          type: credential.type,
+        });
+      }
 
       const credentialsPath = resolveWorkspaceProductionCredentialsFilePath(workspace);
       const fileExistsAlready = await fileExists(credentialsPath);
@@ -103,9 +122,34 @@ export function registerNCredentialsCommand(program: Command): void {
         }
       }
 
+      const newCredentials: CredentialFillCandidate[] = [];
+      for (const credentialId of credentialIds) {
+        if (activeByDevId.has(credentialId) || archivedByDevId.has(credentialId)) {
+          continue;
+        }
+        const credential = devCredentialById.get(credentialId);
+        if (credential) {
+          newCredentials.push({
+            id: credential.id,
+            name: credential.name,
+            type: credential.type,
+          });
+        }
+      }
+
+      const fillDataByCredentialId = await resolveFillDataForNewCredentials(
+        devClient,
+        env,
+        newCredentials,
+        options.fill === true,
+      );
+
       const nextActive: ProductionCredentialEntry[] = [];
       for (const credentialId of credentialIds) {
-        const credential = await devClient.getCredentialById(credentialId);
+        const credential = devCredentialById.get(credentialId);
+        if (!credential) {
+          continue;
+        }
         const existingActive = activeByDevId.get(credentialId);
         if (existingActive) {
           nextActive.push({
@@ -128,8 +172,8 @@ export function registerNCredentialsCommand(program: Command): void {
         const template = await buildTemplateForNewCredential(
           devClient,
           credential.type,
-          credential.id,
           options.fill === true,
+          fillDataByCredentialId.get(credential.id) ?? null,
         );
         nextActive.push({
           dev_id: credential.id,
@@ -309,8 +353,8 @@ async function discoverCredentialDependencies(
 async function buildTemplateForNewCredential(
   devClient: N8nClient,
   credentialType: string | null,
-  credentialId: string,
-  fill: boolean,
+  fillRequested: boolean,
+  fillData: Record<string, unknown> | null,
 ): Promise<ProductionCredentialEntry["template"]> {
   if (!credentialType) {
     return {
@@ -325,13 +369,10 @@ async function buildTemplateForNewCredential(
   try {
     const template = await devClient.getCredentialTemplate(credentialType);
     const data = buildTemplateData(template.fields, template.requiredFields);
-    if (fill) {
-      const devData = await devClient.getCredentialDataForFill(credentialId);
-      if (devData) {
-        for (const [key, value] of Object.entries(devData)) {
-          if (Object.prototype.hasOwnProperty.call(data, key)) {
-            data[key] = value;
-          }
+    if (fillRequested && fillData) {
+      for (const [key, value] of Object.entries(fillData)) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          data[key] = value;
         }
       }
     }
@@ -341,8 +382,10 @@ async function buildTemplateForNewCredential(
       required_fields: template.requiredFields,
       fields: template.fields,
       data,
-      note: fill
-        ? "Filled with DEV credential data when available via API."
+      note: fillRequested
+        ? fillData
+          ? "Filled with data available from DEV API/export endpoint."
+          : "No fill data available. Fields were created from DEV schema."
         : "Fields created from DEV schema with empty values.",
     };
   } catch {
@@ -354,6 +397,156 @@ async function buildTemplateForNewCredential(
       note: "Could not load credential schema from DEV.",
     };
   }
+}
+
+async function resolveFillDataForNewCredentials(
+  devClient: N8nClient,
+  env: AppEnv,
+  newCredentials: CredentialFillCandidate[],
+  fillRequested: boolean,
+): Promise<Map<string, Record<string, unknown>>> {
+  const result = new Map<string, Record<string, unknown>>();
+  if (!fillRequested || newCredentials.length === 0) {
+    return result;
+  }
+
+  for (const credential of newCredentials) {
+    const apiData = await devClient.getCredentialDataForFill(credential.id);
+    if (apiData) {
+      result.set(credential.id, apiData);
+    }
+  }
+
+  const unresolved = newCredentials.filter((credential) => !result.has(credential.id));
+  if (unresolved.length === 0) {
+    logger.info(
+      `[NCREDENTIALS] Fill source=api resolved=${result.size} unresolved=0`,
+    );
+    return result;
+  }
+
+  const endpointUrl = env.N8N_DEV_CREDENTIAL_EXPORT_URL;
+  const endpointToken = env.N8N_DEV_CREDENTIAL_EXPORT_TOKEN;
+  if (!endpointUrl || !endpointToken) {
+    logger.info(
+      `[NCREDENTIALS] Fill source=api resolved=${result.size} unresolved=${unresolved.length} endpoint_fallback=disabled`,
+    );
+    return result;
+  }
+
+  const endpointMap = await fetchFillDataFromExportEndpoint(endpointUrl, endpointToken, unresolved);
+  for (const [credentialId, data] of endpointMap.entries()) {
+    if (!result.has(credentialId)) {
+      result.set(credentialId, data);
+    }
+  }
+
+  const stillUnresolved = newCredentials.filter((credential) => !result.has(credential.id)).length;
+  logger.info(
+    `[NCREDENTIALS] Fill source=api+endpoint resolved=${result.size} unresolved=${stillUnresolved}`,
+  );
+  return result;
+}
+
+async function fetchFillDataFromExportEndpoint(
+  endpointUrl: string,
+  endpointToken: string,
+  credentials: CredentialFillCandidate[],
+): Promise<Map<string, Record<string, unknown>>> {
+  try {
+    const response = await axios.post(
+      endpointUrl,
+      {
+        credentials: credentials.map((credential) => ({
+          dev_id: credential.id,
+          id: credential.id,
+          name: credential.name,
+          type: credential.type,
+        })),
+      },
+      {
+        timeout: 20000,
+        headers: {
+          Authorization: `Bearer ${endpointToken}`,
+          "X-NDEPLOY-TOKEN": endpointToken,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return parseExportEndpointResponse(response.data);
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : null;
+    logger.warn(
+      `[NCREDENTIALS] Credential export endpoint unavailable status=${status ?? "unknown"}`,
+    );
+    return new Map<string, Record<string, unknown>>();
+  }
+}
+
+function parseExportEndpointResponse(
+  payload: unknown,
+): Map<string, Record<string, unknown>> {
+  const items = extractCredentialItems(payload);
+  const result = new Map<string, Record<string, unknown>>();
+
+  for (const item of items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const idValue = record.dev_id ?? record.id;
+    if (typeof idValue !== "string" && typeof idValue !== "number") {
+      continue;
+    }
+    const credentialId = String(idValue);
+    const data = extractCredentialData(record);
+    if (data) {
+      result.set(credentialId, data);
+    }
+  }
+
+  return result;
+}
+
+function extractCredentialItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const root = payload as Record<string, unknown>;
+  const directCandidates = ["credentials", "items", "results", "data"];
+  for (const key of directCandidates) {
+    const value = root[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  const nestedData = root.data;
+  if (nestedData && typeof nestedData === "object" && !Array.isArray(nestedData)) {
+    const nested = nestedData as Record<string, unknown>;
+    for (const key of ["credentials", "items", "results"]) {
+      const value = nested[key];
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+  }
+
+  return [];
+}
+
+function extractCredentialData(record: Record<string, unknown>): Record<string, unknown> | null {
+  const candidates = [record.data, record.credential_data, record.values];
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>;
+    }
+  }
+  return null;
 }
 
 function buildTemplateData(

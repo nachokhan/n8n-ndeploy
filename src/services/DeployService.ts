@@ -6,6 +6,7 @@ import {
   DeployResult,
   WorkflowPublishStatus,
 } from "../types/deployResult.js";
+import { CredentialsManifestEntry } from "../types/credentials.js";
 import { N8nClient } from "./N8nClient.js";
 import { TransformService } from "./TransformService.js";
 import { ApiError, ValidationError } from "../errors/index.js";
@@ -137,7 +138,11 @@ export class DeployService {
     await this.executePlanWithResult(plan, "unknown");
   }
 
-  async executePlanWithResult(plan: DeploymentPlan, project: string): Promise<DeployResult> {
+  async executePlanWithResult(
+    plan: DeploymentPlan,
+    project: string,
+    credentialsManifestByDevId: Map<string, CredentialsManifestEntry> | null = null,
+  ): Promise<DeployResult> {
     logger.info(
       `[DEPLOY][RUN][00] Start deployment plan_id=${plan.metadata.plan_id} actions=${plan.actions.length}`,
     );
@@ -192,7 +197,12 @@ export class DeployService {
 
       const startedAt = Date.now();
       try {
-        const outcome = await this.executeAction(action, idMap, plan.metadata.root_workflow_id);
+        const outcome = await this.executeAction(
+          action,
+          idMap,
+          plan.metadata.root_workflow_id,
+          credentialsManifestByDevId,
+        );
         const elapsedMs = Date.now() - startedAt;
         const mappedId = idMap[action.dev_id] ?? "n/a";
         const actionResult: DeployActionResultItem = {
@@ -265,9 +275,10 @@ export class DeployService {
     action: PlanActionItem,
     idMap: Record<string, string>,
     rootWorkflowDevId: string,
+    credentialsManifestByDevId: Map<string, CredentialsManifestEntry> | null,
   ): Promise<ExecuteActionOutcome> {
     if (action.type === "CREDENTIAL") {
-      return this.executeCredential(action, idMap);
+      return this.executeCredential(action, idMap, credentialsManifestByDevId);
     }
 
     if (action.type === "DATATABLE") {
@@ -280,6 +291,7 @@ export class DeployService {
   private async executeCredential(
     action: PlanActionItem,
     idMap: Record<string, string>,
+    credentialsManifestByDevId: Map<string, CredentialsManifestEntry> | null,
   ): Promise<ExecuteActionOutcome> {
     if (action.action === "MAP_EXISTING" && action.prod_id) {
       logger.debug(
@@ -294,12 +306,35 @@ export class DeployService {
     }
 
     const payload = action.payload as { name: string; type: string };
+    const manifestEntry = credentialsManifestByDevId?.get(action.dev_id) ?? null;
+    if (!manifestEntry) {
+      throw new ValidationError("Credential manifest entry missing for credential CREATE action", {
+        dev_id: action.dev_id,
+        name: payload.name,
+        type: payload.type,
+      });
+    }
+
+    const missingRequiredFields = manifestEntry.template.required_fields.filter((field) =>
+      this.isMissingManifestValue(manifestEntry.template.data[field]),
+    );
+    if (missingRequiredFields.length > 0) {
+      throw new ValidationError("Credential manifest entry is missing required fields", {
+        dev_id: action.dev_id,
+        name: payload.name,
+        type: payload.type,
+        missing_required_fields: missingRequiredFields,
+      });
+    }
+
+    const dataKeys = Object.keys(manifestEntry.template.data);
     logger.debug(
-      `[DEPLOY][RUN][CREDENTIAL] CREATE placeholder name="${payload.name}" type="${payload.type}" data=auto-from-schema`,
+      `[DEPLOY][RUN][CREDENTIAL] CREATE from manifest name="${payload.name}" type="${payload.type}" data_keys=${dataKeys.length}`,
     );
     const created = await this.prodClient.createCredentialPlaceholder({
       name: payload.name,
       type: payload.type,
+      data: manifestEntry.template.data,
     });
     idMap[action.dev_id] = created.id;
     logger.debug(
@@ -674,5 +709,17 @@ export class DeployService {
     }
     const fallback = error as Error;
     return fallback.message;
+  }
+
+  private isMissingManifestValue(value: unknown): boolean {
+    if (value === null || value === undefined) {
+      return true;
+    }
+
+    if (typeof value === "string") {
+      return value.trim().length === 0;
+    }
+
+    return false;
   }
 }

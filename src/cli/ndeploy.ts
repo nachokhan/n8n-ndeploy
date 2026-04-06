@@ -4,8 +4,11 @@ import { N8nClient } from "../services/N8nClient.js";
 import { DeployService } from "../services/DeployService.js";
 import { DeploySummaryService } from "../services/DeploySummaryService.js";
 import { TransformService } from "../services/TransformService.js";
+import { CredentialsManifestEntry, CredentialsManifestFile } from "../types/credentials.js";
 import {
+  fileExists,
   readJsonFile,
+  resolveProjectCredentialsManifestFilePath,
   resolveProjectDeployResultFilePath,
   resolveProjectDeploySummaryFilePath,
   resolveProjectPlanFilePath,
@@ -53,8 +56,9 @@ export function registerNDeployCommand(program: Command): void {
           `[NDEPLOY] Plan valid plan_id=${plan.metadata.plan_id} actions=${plan.actions.length}`,
         );
 
+        const credentialsManifestByDevId = await readCredentialsManifestForApply(project, plan.actions);
         deploySpinner = ora(`Executing ${plan.actions.length} actions`).start();
-        const result = await service.executePlanWithResult(plan, project);
+        const result = await service.executePlanWithResult(plan, project, credentialsManifestByDevId);
         const resultFile = resolveProjectDeployResultFilePath(project);
         const summaryFile = resolveProjectDeploySummaryFilePath(project);
         await writeJsonFile(resultFile, result);
@@ -104,4 +108,31 @@ export function registerNDeployCommand(program: Command): void {
     });
 
   logger.debug("Command apply registered");
+}
+
+async function readCredentialsManifestForApply(
+  project: string,
+  actions: Array<{ type: string; action: string }>,
+): Promise<Map<string, CredentialsManifestEntry> | null> {
+  const requiresCredentialCreation = actions.some(
+    (action) => action.type === "CREDENTIAL" && action.action === "CREATE",
+  );
+  if (!requiresCredentialCreation) {
+    return null;
+  }
+
+  const manifestPath = resolveProjectCredentialsManifestFilePath(project);
+  const manifestExists = await fileExists(manifestPath);
+  if (!manifestExists) {
+    throw new ValidationError(
+      `Missing ${manifestPath}. Run: ndeploy credentials fetch <project> && ndeploy credentials merge-missing <project>`,
+    );
+  }
+
+  const manifest = await readJsonFile<Partial<CredentialsManifestFile>>(manifestPath);
+  if (!manifest.metadata || !Array.isArray(manifest.credentials)) {
+    throw new ValidationError(`Invalid credentials manifest format in ${manifestPath}.`);
+  }
+
+  return new Map(manifest.credentials.map((credential) => [credential.dev_id, credential]));
 }

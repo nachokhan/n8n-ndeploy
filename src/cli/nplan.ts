@@ -6,14 +6,14 @@ import { PlanSummaryService } from "../services/PlanSummaryService.js";
 import { loadEnv } from "../utils/env.js";
 import { logger } from "../utils/logger.js";
 import {
-  backupWorkspacePlanIfExists,
-  ensureWorkspaceDir,
+  backupProjectPlanIfExists,
+  ensureProjectDir,
   fileExists,
   readJsonFile,
-  resolveWorkspacePlanFilePath,
-  resolveWorkspacePlanSummaryFilePath,
-  resolveWorkspaceMetadataFilePath,
-  WorkspaceMetadata,
+  resolveProjectPlanFilePath,
+  resolveProjectPlanSummaryFilePath,
+  resolveProjectMetadataFilePath,
+  ProjectMetadata,
   writeJsonFile,
 } from "../utils/file.js";
 import { ApiError, DependencyError, ValidationError } from "../errors/index.js";
@@ -22,23 +22,23 @@ export function registerNPlanCommand(program: Command): void {
   const nplan = new Command("plan");
 
   nplan
-    .argument("<workspace>", "Workspace directory")
-    .description("Generate deployment plan from workspace root workflow")
-    .action(async (workspace: string) => {
+    .argument("<project>", "Project directory")
+    .description("Generate deployment plan from project root workflow")
+    .action(async (project: string) => {
       const spinner = ora("Preparing nplan execution").start();
       try {
         const env = loadEnv();
         spinner.succeed("Environment loaded");
-        const metadataPath = resolveWorkspaceMetadataFilePath(workspace);
-        const workspaceMetadata = await readWorkspaceMetadata(workspace, metadataPath);
-        const workflowIdDev = workspaceMetadata.plan.root_workflow_id_dev;
+        const metadataPath = resolveProjectMetadataFilePath(project);
+        const projectMetadata = await readProjectMetadata(project, metadataPath);
+        const workflowIdDev = projectMetadata.plan.root_workflow_id_dev;
         if (!workflowIdDev) {
           throw new ValidationError(
-            `Workspace "${workspace}" has no root workflow configured. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+            `Project "${project}" has no root workflow configured. Run: ndeploy create <workflow_id_dev> [project_root]`,
           );
         }
         logger.info(`[NPLAN] root_workflow_id=${workflowIdDev}`);
-        logger.info(`[NPLAN] workspace=${workspace}`);
+        logger.info(`[NPLAN] project=${project}`);
         logger.debug(`[NPLAN] source=${env.N8N_DEV_URL} target=${env.N8N_PROD_URL}`);
 
         const devClient = new N8nClient(env.N8N_DEV_URL, env.N8N_DEV_API_KEY);
@@ -50,10 +50,10 @@ export function registerNPlanCommand(program: Command): void {
         const plan = await service.buildPlan(workflowIdDev);
         const summary = summaryService.buildSummary(plan);
         logger.info("[NPLAN] Plan generated in memory, writing JSON file");
-        await ensureWorkspaceDir(workspace);
-        const outputFile = resolveWorkspacePlanFilePath(workspace);
-        const summaryFile = resolveWorkspacePlanSummaryFilePath(workspace);
-        const backupFile = await backupWorkspacePlanIfExists(workspace);
+        await ensureProjectDir(project);
+        const outputFile = resolveProjectPlanFilePath(project);
+        const summaryFile = resolveProjectPlanSummaryFilePath(project);
+        const backupFile = await backupProjectPlanIfExists(project);
         if (backupFile) {
           logger.success(`[NPLAN] Existing plan backed up to: ${backupFile}`);
         }
@@ -62,14 +62,14 @@ export function registerNPlanCommand(program: Command): void {
         const rootWorkflowAction = plan.actions.find(
           (action) => action.type === "WORKFLOW" && action.dev_id === workflowIdDev,
         );
-        if (rootWorkflowAction && rootWorkflowAction.name !== workspaceMetadata.plan.root_workflow_name) {
+        if (rootWorkflowAction && rootWorkflowAction.name !== projectMetadata.plan.root_workflow_name) {
           const now = new Date().toISOString();
-          workspaceMetadata.plan.root_workflow_name = rootWorkflowAction.name;
-          workspaceMetadata.plan.updated_at = now;
-          workspaceMetadata.updated_at = now;
-          await writeJsonFile(metadataPath, workspaceMetadata);
+          projectMetadata.plan.root_workflow_name = rootWorkflowAction.name;
+          projectMetadata.plan.updated_at = now;
+          projectMetadata.updated_at = now;
+          await writeJsonFile(metadataPath, projectMetadata);
           logger.success(
-            `[NPLAN] Workspace metadata updated with root workflow name="${rootWorkflowAction.name}"`,
+            `[NPLAN] Project metadata updated with root workflow name="${rootWorkflowAction.name}"`,
           );
         }
 
@@ -111,20 +111,20 @@ export function registerNPlanCommand(program: Command): void {
   program.addCommand(nplan);
 }
 
-async function readWorkspaceMetadata(
-  workspace: string,
+async function readProjectMetadata(
+  project: string,
   metadataPath: string,
-): Promise<WorkspaceMetadata> {
+): Promise<ProjectMetadata> {
   const exists = await fileExists(metadataPath);
   if (!exists) {
     throw new ValidationError(
-      `Workspace "${workspace}" is not initialized. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+      `Project "${project}" is not initialized. Run: ndeploy create <workflow_id_dev> [project_root]`,
     );
   }
-  const metadata = await readJsonFile<WorkspaceMetadata>(metadataPath);
+  const metadata = await readJsonFile<ProjectMetadata>(metadataPath);
   if (!metadata.plan) {
     throw new ValidationError(
-      `Workspace "${workspace}" metadata is missing "plan" configuration. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+      `Project "${project}" metadata is missing "plan" configuration. Run: ndeploy create <workflow_id_dev> [project_root]`,
     );
   }
   return metadata;

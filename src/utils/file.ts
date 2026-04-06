@@ -7,11 +7,11 @@ const PRODUCTION_CREDENTIALS_FILE_NAME = "production_credentials.json";
 const DEPLOY_RESULT_FILE_NAME = "deploy_result.json";
 const DEPLOY_SUMMARY_FILE_NAME = "deploy_summary.json";
 const REPORTS_DIR_NAME = "reports";
-const WORKSPACE_METADATA_FILE_NAME = "workspace.json";
+const PROJECT_METADATA_FILE_NAME = "project.json";
 
-export interface WorkspaceMetadata {
+export interface ProjectMetadata {
   schema_version: number;
-  workspace: string;
+  project: string;
   name: string;
   plan: {
     root_workflow_id_dev: string | null;
@@ -35,50 +35,50 @@ export async function readJsonFile<T>(filePath: string): Promise<T> {
   return JSON.parse(raw) as T;
 }
 
-export function resolveWorkspaceDir(workspace: string): string {
-  return path.resolve(process.cwd(), workspace);
+export function resolveProjectDir(project: string): string {
+  return path.resolve(process.cwd(), project);
 }
 
-export async function ensureWorkspaceDir(workspace: string): Promise<string> {
-  const workspaceDir = resolveWorkspaceDir(workspace);
-  await fs.mkdir(workspaceDir, { recursive: true });
-  return workspaceDir;
+export async function ensureProjectDir(project: string): Promise<string> {
+  const projectDir = resolveProjectDir(project);
+  await fs.mkdir(projectDir, { recursive: true });
+  return projectDir;
 }
 
-export function resolveWorkspacePlanFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), PLAN_FILE_NAME);
+export function resolveProjectPlanFilePath(project: string): string {
+  return path.join(resolveProjectDir(project), PLAN_FILE_NAME);
 }
 
-export function resolveWorkspaceReportsDir(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), REPORTS_DIR_NAME);
+export function resolveProjectReportsDir(project: string): string {
+  return path.join(resolveProjectDir(project), REPORTS_DIR_NAME);
 }
 
-export function resolveWorkspacePlanSummaryFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceReportsDir(workspace), PLAN_SUMMARY_FILE_NAME);
+export function resolveProjectPlanSummaryFilePath(project: string): string {
+  return path.join(resolveProjectReportsDir(project), PLAN_SUMMARY_FILE_NAME);
 }
 
-export function resolveWorkspaceProductionCredentialsFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), PRODUCTION_CREDENTIALS_FILE_NAME);
+export function resolveProjectProductionCredentialsFilePath(project: string): string {
+  return path.join(resolveProjectDir(project), PRODUCTION_CREDENTIALS_FILE_NAME);
 }
 
-export function resolveWorkspaceDeployResultFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceReportsDir(workspace), DEPLOY_RESULT_FILE_NAME);
+export function resolveProjectDeployResultFilePath(project: string): string {
+  return path.join(resolveProjectReportsDir(project), DEPLOY_RESULT_FILE_NAME);
 }
 
-export function resolveWorkspaceDeploySummaryFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceReportsDir(workspace), DEPLOY_SUMMARY_FILE_NAME);
+export function resolveProjectDeploySummaryFilePath(project: string): string {
+  return path.join(resolveProjectReportsDir(project), DEPLOY_SUMMARY_FILE_NAME);
 }
 
-export function resolveWorkspaceOrphansFilePath(workspace: string, side: "source" | "target"): string {
-  return path.join(resolveWorkspaceReportsDir(workspace), `orphans_${side}.json`);
+export function resolveProjectOrphansFilePath(project: string, side: "source" | "target"): string {
+  return path.join(resolveProjectReportsDir(project), `orphans_${side}.json`);
 }
 
-export function resolveWorkspaceDanglingFilePath(workspace: string, side: "source" | "target"): string {
-  return path.join(resolveWorkspaceReportsDir(workspace), `dangling_${side}.json`);
+export function resolveProjectDanglingFilePath(project: string, side: "source" | "target"): string {
+  return path.join(resolveProjectReportsDir(project), `dangling_${side}.json`);
 }
 
-export function resolveWorkspaceMetadataFilePath(workspace: string): string {
-  return path.join(resolveWorkspaceDir(workspace), WORKSPACE_METADATA_FILE_NAME);
+export function resolveProjectMetadataFilePath(project: string): string {
+  return path.join(resolveProjectDir(project), PROJECT_METADATA_FILE_NAME);
 }
 
 export async function fileExists(filePath: string): Promise<boolean> {
@@ -90,8 +90,8 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function backupWorkspacePlanIfExists(workspace: string): Promise<string | null> {
-  const planPath = resolveWorkspacePlanFilePath(workspace);
+export async function backupProjectPlanIfExists(project: string): Promise<string | null> {
+  const planPath = resolveProjectPlanFilePath(project);
   try {
     await fs.access(planPath);
   } catch {
@@ -99,7 +99,7 @@ export async function backupWorkspacePlanIfExists(workspace: string): Promise<st
   }
 
   const stamp = new Date().toISOString().replaceAll(":", "-");
-  const backupPath = path.join(resolveWorkspaceDir(workspace), `plan_backup_${stamp}.json`);
+  const backupPath = path.join(resolveProjectDir(project), `plan_backup_${stamp}.json`);
   await fs.rename(planPath, backupPath);
   return backupPath;
 }

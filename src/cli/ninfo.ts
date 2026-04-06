@@ -3,13 +3,13 @@ import { Command } from "commander";
 import {
   fileExists,
   readJsonFile,
-  resolveWorkspaceDeployResultFilePath,
-  resolveWorkspaceDeploySummaryFilePath,
-  resolveWorkspaceDir,
-  resolveWorkspaceMetadataFilePath,
-  resolveWorkspacePlanFilePath,
-  resolveWorkspaceProductionCredentialsFilePath,
-  resolveWorkspacePlanSummaryFilePath,
+  resolveProjectDeployResultFilePath,
+  resolveProjectDeploySummaryFilePath,
+  resolveProjectDir,
+  resolveProjectMetadataFilePath,
+  resolveProjectPlanFilePath,
+  resolveProjectProductionCredentialsFilePath,
+  resolveProjectPlanSummaryFilePath,
   writeJsonFile,
 } from "../utils/file.js";
 import { ValidationError } from "../errors/index.js";
@@ -19,9 +19,9 @@ interface InfoCommandOptions {
   output?: string;
 }
 
-interface WorkspaceInfoOutput {
-  workspace: string;
-  workspace_path: string;
+interface ProjectInfoOutput {
+  project: string;
+  project_path: string;
   metadata: {
     exists: boolean;
     path: string;
@@ -85,24 +85,24 @@ interface WorkspaceInfoOutput {
 export function registerNInfoCommand(program: Command): void {
   program
     .command("info")
-    .argument("<workspace>", "Workspace directory")
+    .argument("<project>", "Project directory")
     .option("-o, --output <file_path>", "Write JSON result to file")
-    .description("Show workspace metadata and generated artifact status")
-    .action(async (workspace: string, options: InfoCommandOptions) => {
-      const workspacePath = resolveWorkspaceDir(workspace);
-      const workspaceExists = await fileExists(workspacePath);
-      if (!workspaceExists) {
+    .description("Show project metadata and generated artifact status")
+    .action(async (project: string, options: InfoCommandOptions) => {
+      const projectPath = resolveProjectDir(project);
+      const projectExists = await fileExists(projectPath);
+      if (!projectExists) {
         throw new ValidationError(
-          `Workspace "${workspace}" does not exist at ${workspacePath}. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+          `Project "${project}" does not exist at ${projectPath}. Run: ndeploy create <workflow_id_dev> [project_root]`,
         );
       }
 
-      const metadataPath = resolveWorkspaceMetadataFilePath(workspace);
-      const planPath = resolveWorkspacePlanFilePath(workspace);
-      const planSummaryPath = resolveWorkspacePlanSummaryFilePath(workspace);
-      const productionCredentialsPath = resolveWorkspaceProductionCredentialsFilePath(workspace);
-      const deployResultPath = resolveWorkspaceDeployResultFilePath(workspace);
-      const deploySummaryPath = resolveWorkspaceDeploySummaryFilePath(workspace);
+      const metadataPath = resolveProjectMetadataFilePath(project);
+      const planPath = resolveProjectPlanFilePath(project);
+      const planSummaryPath = resolveProjectPlanSummaryFilePath(project);
+      const productionCredentialsPath = resolveProjectProductionCredentialsFilePath(project);
+      const deployResultPath = resolveProjectDeployResultFilePath(project);
+      const deploySummaryPath = resolveProjectDeploySummaryFilePath(project);
 
       const metadataExists = await fileExists(metadataPath);
       const planExists = await fileExists(planPath);
@@ -128,9 +128,9 @@ export function registerNInfoCommand(program: Command): void {
         ? await readJsonFile<Record<string, unknown>>(deploySummaryPath)
         : null;
 
-      const output: WorkspaceInfoOutput = {
-        workspace,
-        workspace_path: workspacePath,
+      const output: ProjectInfoOutput = {
+        project,
+        project_path: projectPath,
         metadata: {
           exists: metadataExists,
           path: metadataPath,

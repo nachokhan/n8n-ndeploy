@@ -5,8 +5,8 @@ import { N8nClient, WorkflowSummaryItem } from "../services/N8nClient.js";
 import { loadEnv } from "../utils/env.js";
 import {
   fileExists,
-  resolveWorkspaceDir,
-  resolveWorkspaceOrphansFilePath,
+  resolveProjectDir,
+  resolveProjectOrphansFilePath,
   writeJsonFile,
 } from "../utils/file.js";
 import { logger } from "../utils/logger.js";
@@ -33,7 +33,7 @@ interface OrphansOutput {
 export function registerNOrphansCommand(program: Command): void {
   program
     .command("orphans")
-    .argument("<workspace>", "Workspace directory")
+    .argument("<project>", "Project directory")
     .description("List unreferenced workflows, credentials, and data tables")
     .requiredOption("--side <source|target>", "Choose which configured instance to analyze")
     .option("--workflows", "Include orphan workflows")
@@ -42,13 +42,13 @@ export function registerNOrphansCommand(program: Command): void {
     .option("--datatables", "Alias of --data-tables")
     .option("--all", "Include all entity types")
     .option("-o, --output <file_path>", "Write JSON result to file")
-    .action(async (workspace: string, options: OrphansCommandOptions) => {
+    .action(async (project: string, options: OrphansCommandOptions) => {
       const spinner = ora("Preparing orphan analysis").start();
       try {
-        const workspaceDir = resolveWorkspaceDir(workspace);
-        const workspaceExists = await fileExists(workspaceDir);
-        if (!workspaceExists) {
-          throw new ValidationError(`Workspace "${workspace}" does not exist at ${workspaceDir}`);
+        const projectDir = resolveProjectDir(project);
+        const projectExists = await fileExists(projectDir);
+        if (!projectExists) {
+          throw new ValidationError(`Project "${project}" does not exist at ${projectDir}`);
         }
 
         const env = loadEnv();
@@ -61,7 +61,7 @@ export function registerNOrphansCommand(program: Command): void {
             : new N8nClient(env.N8N_PROD_URL, env.N8N_PROD_API_KEY);
 
         const instanceUrl = side === "source" ? env.N8N_DEV_URL : env.N8N_PROD_URL;
-        logger.info(`[NORPHANS] workspace=${workspace} side=${side} instance=${instanceUrl}`);
+        logger.info(`[NORPHANS] project=${project} side=${side} instance=${instanceUrl}`);
 
         spinner.text = "Loading workflows and computing references";
         const workflowSummaries = await client.listWorkflowsSummary();
@@ -143,7 +143,7 @@ export function registerNOrphansCommand(program: Command): void {
         }
 
         spinner.succeed("Orphan analysis completed");
-        const outputPath = resolveOutputPath(options.output, workspace, side);
+        const outputPath = resolveOutputPath(options.output, project, side);
         await writeResultFile(outputPath, response, "NORPHANS");
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
@@ -168,13 +168,13 @@ async function writeResultFile(
 
 function resolveOutputPath(
   outputPath: string | undefined,
-  workspace: string,
+  project: string,
   side: Side,
 ): string {
   if (outputPath) {
     return path.resolve(process.cwd(), outputPath);
   }
-  return resolveWorkspaceOrphansFilePath(workspace, side);
+  return resolveProjectOrphansFilePath(project, side);
 }
 
 function parseSide(value: string | undefined): Side {

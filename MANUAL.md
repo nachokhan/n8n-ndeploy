@@ -48,42 +48,42 @@ Con eso puedes usar `ndeploy` sin `npm run`.
 
 ## 4. Comandos disponibles
 
-## 4.1 Crear workspace
+## 4.1 Crear project
 
 ```bash
-ndeploy create <workflow_id_dev> [workspace_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
 Resultado esperado:
 
-1. Se crea la carpeta del workspace usando el nombre del workflow en DEV.
-2. Se inicializa `<workspace>/workspace.json` con metadata base.
-3. Queda configurado el root workflow en `workspace.json` (`plan.root_workflow_id_dev` y `plan.root_workflow_name`).
-4. Si pasas `--force`, se re-inicializa `workspace.json` existente.
-5. `workspace_root` es opcional para indicar dónde crear la carpeta (por defecto, directorio actual).
+1. Se crea la carpeta del project usando el nombre del workflow en DEV.
+2. Se inicializa `<project>/project.json` con metadata base.
+3. Queda configurado el root workflow en `project.json` (`plan.root_workflow_id_dev` y `plan.root_workflow_name`).
+4. Si pasas `--force`, se re-inicializa `project.json` existente.
+5. `project_root` es opcional para indicar dónde crear la carpeta (por defecto, directorio actual).
 
 ## 4.2 Generar plan
 
 ```bash
-ndeploy plan <workspace>
+ndeploy plan <project>
 ```
 
 Resultado esperado:
 
-1. Se genera un archivo `<workspace>/plan.json`.
-2. Se genera `<workspace>/reports/plan_summary.json` para vista rápida.
+1. Se genera un archivo `<project>/plan.json`.
+2. Se genera `<project>/reports/plan_summary.json` para vista rápida.
 3. Si ya existe `plan.json`, se renombra a `plan_backup_<timestamp>.json`.
 4. Ese plan contiene acciones para credenciales, data tables y workflows.
 
 Importante:
 
-1. `ndeploy plan <workspace>` usa el workflow root guardado en `<workspace>/workspace.json`.
-2. Si no hay workflow root configurado, el comando falla y te pedirá crear/configurar el workspace.
+1. `ndeploy plan <project>` usa el workflow root guardado en `<project>/project.json`.
+2. Si no hay workflow root configurado, el comando falla y te pedirá crear/configurar el project.
 
 ## 4.3 Aplicar plan
 
 ```bash
-ndeploy apply <workspace>
+ndeploy apply <project>
 ```
 
 Resultado esperado:
@@ -91,8 +91,8 @@ Resultado esperado:
 1. Ejecuta las acciones del plan en PROD.
 2. Auto-publica subworkflows cuando corresponde.
 3. No auto-publica el root workflow.
-4. Genera `<workspace>/reports/deploy_result.json` (resultado completo).
-5. Genera `<workspace>/reports/deploy_summary.json` (vista rápida).
+4. Genera `<project>/reports/deploy_result.json` (resultado completo).
+5. Genera `<project>/reports/deploy_summary.json` (vista rápida).
 6. Si falla en mitad del deploy, igualmente escribe resultados parciales.
 
 ## 4.4 Publicar manualmente
@@ -106,16 +106,16 @@ Uso típico:
 1. Publicar el root workflow al final del proceso.
 2. Publicar manualmente cualquier workflow específico en PROD.
 
-## 4.5 Info del workspace
+## 4.5 Info del project
 
 ```bash
-ndeploy info <workspace>
+ndeploy info <project>
 ```
 
 Resultado esperado:
 
-1. Imprime JSON con estado del workspace.
-2. Muestra metadata de `workspace.json`.
+1. Imprime JSON con estado del project.
+2. Muestra metadata de `project.json`.
 3. Muestra si existen `plan.json`, `reports/plan_summary.json`, `production_credentials.json`, `reports/deploy_result.json`, `reports/deploy_summary.json`.
 4. Si los archivos existen, muestra metadata y contadores útiles (por ejemplo `plan_id`, `run_id`, `executed/skipped/failed`).
 5. Con `--output`, también escribe ese JSON en el path indicado.
@@ -151,7 +151,7 @@ ndeploy remove --all --yes
 ## 4.7 Detectar huérfanos
 
 ```bash
-ndeploy orphans <workspace> --side <source|target>
+ndeploy orphans <project> --side <source|target>
 ```
 
 Reglas:
@@ -161,7 +161,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros de entidad, se asume `--all`.
 5. Los workflows archivados se consideran borrados y no cuentan para referencias.
-6. Si no pasas `--output`, guarda en `<workspace>/reports/orphans_<side>.json`.
+6. Si no pasas `--output`, guarda en `<project>/reports/orphans_<side>.json`.
 
 Salida:
 
@@ -171,15 +171,15 @@ Salida:
 Ejemplos:
 
 ```bash
-ndeploy orphans <workspace> --side target
-ndeploy orphans <workspace> --side source --credentials
-ndeploy orphans <workspace> --side target --workflows --datatables
+ndeploy orphans <project> --side target
+ndeploy orphans <project> --side source --credentials
+ndeploy orphans <project> --side target --workflows --datatables
 ```
 
 ## 4.8 Detectar referencias colgantes
 
 ```bash
-ndeploy dangling-refs <workspace> --side <source|target>
+ndeploy dangling-refs <project> --side <source|target>
 ```
 
 Reglas:
@@ -189,7 +189,7 @@ Reglas:
 3. Filtros disponibles: `--workflows`, `--credentials`, `--data-tables` (alias `--datatables`) y `--all`.
 4. Si no pasas filtros, se asume `--all`.
 5. Solo se analizan workflows no archivados.
-6. Si no pasas `--output`, guarda en `<workspace>/reports/dangling_<side>.json`.
+6. Si no pasas `--output`, guarda en `<project>/reports/dangling_<side>.json`.
 
 Salida:
 
@@ -200,21 +200,21 @@ Salida:
 Ejemplos:
 
 ```bash
-ndeploy dangling-refs <workspace> --side target
-ndeploy dangling <workspace> --side source --credentials
-ndeploy dangling-refs <workspace> --side target --workflows --datatables
+ndeploy dangling-refs <project> --side target
+ndeploy dangling <project> --side source --credentials
+ndeploy dangling-refs <project> --side target --workflows --datatables
 ```
 
-## 4.9 Actualizar credenciales del workspace
+## 4.9 Actualizar credenciales del project
 
 ```bash
-ndeploy credentials update <workspace>
+ndeploy credentials update <project>
 ```
 
 Reglas:
 
 1. Consulta DEV para obtener credenciales usadas por el workflow root y subworkflows recursivos.
-2. Si `<workspace>/production_credentials.json` no existe:
+2. Si `<project>/production_credentials.json` no existe:
    - crea `active_credentials` con templates completos.
    - con `--fill`, completa nuevos campos con la mayor info disponible por API.
 3. Si el archivo existe:
@@ -230,19 +230,19 @@ Reglas:
 Ejemplos:
 
 ```bash
-ndeploy credentials update <workspace_generado>
-ndeploy credentials update <workspace_generado> --fill
+ndeploy credentials update <project_generado>
+ndeploy credentials update <project_generado> --fill
 ```
 
-## 4.10 Validar credenciales del workspace
+## 4.10 Validar credenciales del project
 
 ```bash
-ndeploy credentials validate <workspace>
+ndeploy credentials validate <project>
 ```
 
 Reglas:
 
-1. Lee `<workspace>/production_credentials.json`.
+1. Lee `<project>/production_credentials.json`.
 2. No consulta APIs de DEV ni PROD en este comando.
 3. Evalúa `template.required_fields` contra `template.data` en `active_credentials`.
 4. Considera faltante: `null`, `undefined` o string vacío.
@@ -253,14 +253,14 @@ Reglas:
 Ejemplos:
 
 ```bash
-ndeploy credentials validate <workspace_generado>
-ndeploy credentials validate <workspace_generado> --strict
-ndeploy credentials validate <workspace_generado> --output tmp/credentials_validation.json
+ndeploy credentials validate <project_generado>
+ndeploy credentials validate <project_generado> --strict
+ndeploy credentials validate <project_generado> --output tmp/credentials_validation.json
 ```
 
 ## 5. Flujo recomendado de uso
 
-1. Crear workspace:
+1. Crear project:
 
 ```bash
 ndeploy create YI2AqhHvG8gfsyM2 tmp
@@ -271,7 +271,7 @@ ndeploy create YI2AqhHvG8gfsyM2 tmp
 3. Generar plan:
 
 ```bash
-ndeploy plan <workspace_generado>
+ndeploy plan <project_generado>
 ```
 
 4. Revisar `reports/plan_summary.json` (y `plan.json` si necesitas detalle total).
@@ -279,7 +279,7 @@ ndeploy plan <workspace_generado>
 5. Actualizar archivo de credenciales:
 
 ```bash
-ndeploy credentials update <workspace_generado> --fill
+ndeploy credentials update <project_generado> --fill
 ```
 
 6. Revisar/ajustar `production_credentials.json` con valores correctos de PROD.
@@ -287,13 +287,13 @@ ndeploy credentials update <workspace_generado> --fill
 7. Validar credenciales:
 
 ```bash
-ndeploy credentials validate <workspace_generado> --strict
+ndeploy credentials validate <project_generado> --strict
 ```
 
 8. Aplicar el plan:
 
 ```bash
-ndeploy apply <workspace_generado>
+ndeploy apply <project_generado>
 ```
 
 9. Revisar `reports/deploy_summary.json` (y `reports/deploy_result.json` si necesitas auditoría completa).
@@ -479,12 +479,12 @@ ndeploy orphans --help
 ndeploy dangling-refs --help
 
 # Flujo base
-ndeploy create <workflow_id_dev> [workspace_root]
-ndeploy plan <workspace>
-ndeploy apply <workspace>
-ndeploy info <workspace>
+ndeploy create <workflow_id_dev> [project_root]
+ndeploy plan <project>
+ndeploy apply <project>
+ndeploy info <project>
 ndeploy publish <workflow_id_prod>
 ndeploy remove --all --yes
-ndeploy orphans <workspace> --side target
-ndeploy dangling-refs <workspace> --side target
+ndeploy orphans <project> --side target
+ndeploy dangling-refs <project> --side target
 ```

@@ -137,7 +137,7 @@ export class DeployService {
     await this.executePlanWithResult(plan, "unknown");
   }
 
-  async executePlanWithResult(plan: DeploymentPlan, workspace: string): Promise<DeployResult> {
+  async executePlanWithResult(plan: DeploymentPlan, project: string): Promise<DeployResult> {
     logger.info(
       `[DEPLOY][RUN][00] Start deployment plan_id=${plan.metadata.plan_id} actions=${plan.actions.length}`,
     );
@@ -156,7 +156,7 @@ export class DeployService {
       metadata: {
         run_id: randomUUID(),
         plan_id: plan.metadata.plan_id,
-        workspace,
+        project,
         started_at: startedAt,
         finished_at: startedAt,
         force_update: this.options.forceUpdate === true,

@@ -23,7 +23,7 @@ export interface ProductionCredentialEntry {
 
 export interface ProductionCredentialsMetadata {
   schema_version: number;
-  workspace: string;
+  project: string;
   root_workflow_id_dev: string;
   root_workflow_name: string | null;
   updated_at: string;

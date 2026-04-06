@@ -6,9 +6,9 @@ import { DeploySummaryService } from "../services/DeploySummaryService.js";
 import { TransformService } from "../services/TransformService.js";
 import {
   readJsonFile,
-  resolveWorkspaceDeployResultFilePath,
-  resolveWorkspaceDeploySummaryFilePath,
-  resolveWorkspacePlanFilePath,
+  resolveProjectDeployResultFilePath,
+  resolveProjectDeploySummaryFilePath,
+  resolveProjectPlanFilePath,
   writeJsonFile,
 } from "../utils/file.js";
 import { loadEnv } from "../utils/env.js";
@@ -18,21 +18,21 @@ import { ApiError, ValidationError } from "../errors/index.js";
 export function registerNDeployCommand(program: Command): void {
   program
     .command("apply")
-    .argument("<workspace>", "Workspace directory")
+    .argument("<project>", "Project directory")
     .option(
       "--force-update",
       "Always execute workflow UPDATE actions, even when PROD content is already equivalent",
     )
-    .description("Execute workspace/plan.json deployment plan in PROD")
-    .action(async (workspace: string, options: { forceUpdate?: boolean }) => {
+    .description("Execute project/plan.json deployment plan in PROD")
+    .action(async (project: string, options: { forceUpdate?: boolean }) => {
       const validateSpinner = ora("Preparing ndeploy execution").start();
       let deploySpinner: ReturnType<typeof ora> | null = null;
       let service: DeployService | null = null;
       try {
         const env = loadEnv();
         validateSpinner.succeed("Environment loaded");
-        const planFilePath = resolveWorkspacePlanFilePath(workspace);
-        logger.info(`[NDEPLOY] workspace=${workspace}`);
+        const planFilePath = resolveProjectPlanFilePath(project);
+        logger.info(`[NDEPLOY] project=${project}`);
         logger.info(`[NDEPLOY] plan_file=${planFilePath}`);
         logger.info(`[NDEPLOY] force_update=${options.forceUpdate === true}`);
         logger.debug(`[NDEPLOY] source=${env.N8N_DEV_URL} target=${env.N8N_PROD_URL}`);
@@ -54,9 +54,9 @@ export function registerNDeployCommand(program: Command): void {
         );
 
         deploySpinner = ora(`Executing ${plan.actions.length} actions`).start();
-        const result = await service.executePlanWithResult(plan, workspace);
-        const resultFile = resolveWorkspaceDeployResultFilePath(workspace);
-        const summaryFile = resolveWorkspaceDeploySummaryFilePath(workspace);
+        const result = await service.executePlanWithResult(plan, project);
+        const resultFile = resolveProjectDeployResultFilePath(project);
+        const summaryFile = resolveProjectDeploySummaryFilePath(project);
         await writeJsonFile(resultFile, result);
         await writeJsonFile(summaryFile, summaryService.buildSummary(result));
         logger.success(`Deploy result file: ${resultFile}`);
@@ -67,8 +67,8 @@ export function registerNDeployCommand(program: Command): void {
         if (runResult) {
           try {
             const summaryService = new DeploySummaryService();
-            const resultFile = resolveWorkspaceDeployResultFilePath(workspace);
-            const summaryFile = resolveWorkspaceDeploySummaryFilePath(workspace);
+            const resultFile = resolveProjectDeployResultFilePath(project);
+            const summaryFile = resolveProjectDeploySummaryFilePath(project);
             await writeJsonFile(resultFile, runResult);
             await writeJsonFile(summaryFile, summaryService.buildSummary(runResult));
             logger.warn(`[NDEPLOY] Partial deploy result file written: ${resultFile}`);

@@ -5,12 +5,12 @@ import { N8nClient } from "../services/N8nClient.js";
 import { ValidationError } from "../errors/index.js";
 import { AppEnv, loadEnv } from "../utils/env.js";
 import {
-  WorkspaceMetadata,
+  ProjectMetadata,
   fileExists,
   readJsonFile,
-  resolveWorkspaceDir,
-  resolveWorkspaceMetadataFilePath,
-  resolveWorkspaceProductionCredentialsFilePath,
+  resolveProjectDir,
+  resolveProjectMetadataFilePath,
+  resolveProjectProductionCredentialsFilePath,
   writeJsonFile,
 } from "../utils/file.js";
 import { logger } from "../utils/logger.js";
@@ -52,8 +52,8 @@ interface CredentialValidationItem {
 }
 
 interface CredentialsValidationResult {
-  workspace: string;
-  workspace_path: string;
+  project: string;
+  project_path: string;
   production_credentials_file: string;
   updated_at: string | null;
   totals: {
@@ -70,33 +70,33 @@ export function registerNCredentialsCommand(program: Command): void {
 
   credentials
     .command("update")
-    .argument("<workspace>", "Workspace directory")
+    .argument("<project>", "Project directory")
     .option("--fill", "Prefill new credentials with as much DEV API data as available")
     .option("--side <source|target>", "Choose which configured instance to use as fill source", "source")
     .description("Create or update production_credentials.json from DEV root workflow dependencies")
-    .action(async (workspace: string, options: CredentialsUpdateOptions) => {
+    .action(async (project: string, options: CredentialsUpdateOptions) => {
       const env = loadEnv();
       const fillSide = parseSide(options.side);
-      const workspacePath = resolveWorkspaceDir(workspace);
-      const workspaceExists = await fileExists(workspacePath);
-      if (!workspaceExists) {
+      const projectPath = resolveProjectDir(project);
+      const projectExists = await fileExists(projectPath);
+      if (!projectExists) {
         throw new ValidationError(
-          `Workspace "${workspace}" does not exist at ${workspacePath}. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+          `Project "${project}" does not exist at ${projectPath}. Run: ndeploy create <workflow_id_dev> [project_root]`,
         );
       }
 
-      const metadataPath = resolveWorkspaceMetadataFilePath(workspace);
+      const metadataPath = resolveProjectMetadataFilePath(project);
       const metadataExists = await fileExists(metadataPath);
       if (!metadataExists) {
         throw new ValidationError(
-          `Workspace "${workspace}" is not initialized. Missing ${metadataPath}.`,
+          `Project "${project}" is not initialized. Missing ${metadataPath}.`,
         );
       }
-      const workspaceMetadata = await readJsonFile<WorkspaceMetadata>(metadataPath);
-      const rootWorkflowId = workspaceMetadata.plan?.root_workflow_id_dev;
+      const projectMetadata = await readJsonFile<ProjectMetadata>(metadataPath);
+      const rootWorkflowId = projectMetadata.plan?.root_workflow_id_dev;
       if (!rootWorkflowId) {
         throw new ValidationError(
-          `Workspace "${workspace}" has no root workflow configured. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+          `Project "${project}" has no root workflow configured. Run: ndeploy create <workflow_id_dev> [project_root]`,
         );
       }
 
@@ -117,7 +117,7 @@ export function registerNCredentialsCommand(program: Command): void {
         });
       }
 
-      const credentialsPath = resolveWorkspaceProductionCredentialsFilePath(workspace);
+      const credentialsPath = resolveProjectProductionCredentialsFilePath(project);
       const fileExistsAlready = await fileExists(credentialsPath);
       const existingFile = fileExistsAlready
         ? await readExistingCredentialsFile(credentialsPath)
@@ -252,9 +252,9 @@ export function registerNCredentialsCommand(program: Command): void {
       const nextFile: ProductionCredentialsFile = {
         metadata: {
           schema_version: 2,
-          workspace,
+          project,
           root_workflow_id_dev: rootWorkflowId,
-          root_workflow_name: discovery.rootWorkflowName ?? workspaceMetadata.plan.root_workflow_name,
+          root_workflow_name: discovery.rootWorkflowName ?? projectMetadata.plan.root_workflow_name,
           updated_at: now,
         },
         active_credentials: nextActive,
@@ -270,24 +270,24 @@ export function registerNCredentialsCommand(program: Command): void {
 
   credentials
     .command("validate")
-    .argument("<workspace>", "Workspace directory")
+    .argument("<project>", "Project directory")
     .option("-o, --output <file_path>", "Write JSON report to file")
     .option("--strict", "Exit with error if missing required fields are found")
     .description("Validate required fields for active credentials in production_credentials.json")
-    .action(async (workspace: string, options: CredentialsValidateOptions) => {
-      const workspacePath = resolveWorkspaceDir(workspace);
-      const workspaceExists = await fileExists(workspacePath);
-      if (!workspaceExists) {
+    .action(async (project: string, options: CredentialsValidateOptions) => {
+      const projectPath = resolveProjectDir(project);
+      const projectExists = await fileExists(projectPath);
+      if (!projectExists) {
         throw new ValidationError(
-          `Workspace "${workspace}" does not exist at ${workspacePath}. Run: ndeploy create <workflow_id_dev> [workspace_root]`,
+          `Project "${project}" does not exist at ${projectPath}. Run: ndeploy create <workflow_id_dev> [project_root]`,
         );
       }
 
-      const credentialsFilePath = resolveWorkspaceProductionCredentialsFilePath(workspace);
+      const credentialsFilePath = resolveProjectProductionCredentialsFilePath(project);
       const credentialsFileExists = await fileExists(credentialsFilePath);
       if (!credentialsFileExists) {
         throw new ValidationError(
-          `Missing ${credentialsFilePath}. Run: ndeploy credentials update <workspace>`,
+          `Missing ${credentialsFilePath}. Run: ndeploy credentials update <project>`,
         );
       }
 
@@ -313,8 +313,8 @@ export function registerNCredentialsCommand(program: Command): void {
       const readyCount = validationItems.filter((item) => item.missing_required_fields.length === 0).length;
 
       const result: CredentialsValidationResult = {
-        workspace,
-        workspace_path: workspacePath,
+        project,
+        project_path: projectPath,
         production_credentials_file: credentialsFilePath,
         updated_at: file.metadata?.updated_at ?? null,
         totals: {

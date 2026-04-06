@@ -72,30 +72,30 @@ N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
 
 ## Befehle
 
-### 1) Workspace erstellen
+### 1) Project erstellen
 
 ```bash
-ndeploy create <workflow_id_dev> [workspace_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
-Erstellt den Workspace-Ordner auf Basis des Workflow-Namens in DEV und initialisiert `workspace.json`.
-Mit optionalem `workspace_root` kann das Zielverzeichnis gewählt werden (Standard: aktuelles Verzeichnis).
-Mit `--force` wird die Metadata neu initialisiert, wenn der Workspace bereits existiert.
+Erstellt den Project-Ordner auf Basis des Workflow-Namens in DEV und initialisiert `project.json`.
+Mit optionalem `project_root` kann das Zielverzeichnis gewählt werden (Standard: aktuelles Verzeichnis).
+Mit `--force` wird die Metadata neu initialisiert, wenn der Project bereits existiert.
 
 ### 2) Plan erzeugen
 
 ```bash
-ndeploy plan <workspace>
+ndeploy plan <project>
 ```
 
-Verwendet den in `<workspace>/workspace.json` konfigurierten Root-Workflow.
+Verwendet den in `<project>/project.json` konfigurierten Root-Workflow.
 Erzeugt:
-- `<workspace>/plan.json`
-- `<workspace>/reports/plan_summary.json`
+- `<project>/plan.json`
+- `<project>/reports/plan_summary.json`
 
 Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp>.json` erstellt.
 
-`ndeploy create` schreibt die Root-Workflow-Konfiguration in `workspace.json`:
+`ndeploy create` schreibt die Root-Workflow-Konfiguration in `project.json`:
 - `plan.root_workflow_id_dev`
 - `plan.root_workflow_name`
 - `plan.updated_at`
@@ -103,20 +103,20 @@ Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp
 ### 3) Plan anwenden
 
 ```bash
-ndeploy apply <workspace>
+ndeploy apply <project>
 ```
 
 Führt den Plan in PROD aus (Credentials, Data Tables, Workflows).
 Schreibt:
-- `<workspace>/reports/deploy_result.json`
-- `<workspace>/reports/deploy_summary.json`
+- `<project>/reports/deploy_result.json`
+- `<project>/reports/deploy_summary.json`
 
 Wenn das Deployment mitten im Lauf fehlschlägt, werden trotzdem partielle Ergebnisdateien geschrieben.
 
 Workflow-Updates erzwingen, auch wenn PROD bereits äquivalent ist:
 
 ```bash
-ndeploy apply <workspace> --force-update
+ndeploy apply <project> --force-update
 ```
 
 ### 4) Manuell veröffentlichen
@@ -127,21 +127,21 @@ ndeploy publish <workflow_id_prod>
 
 Manueller Publish-Befehl für Root-Workflow (oder beliebigen Workflow) in PROD.
 
-### 5) Workspace-Info
+### 5) Project-Info
 
 ```bash
-ndeploy info <workspace>
+ndeploy info <project>
 ```
 
-Zeigt den Workspace-Status als JSON:
-- Metadaten aus `workspace.json`
+Zeigt den Project-Status als JSON:
+- Metadaten aus `project.json`
 - Existenz und Kern-Metadaten von `plan.json` / `reports/plan_summary.json` / `production_credentials.json`
 - Existenz und Kernzähler von `reports/deploy_result.json` / `reports/deploy_summary.json`
 
 Optional:
 
 ```bash
-ndeploy info <workspace> --output <file_path>
+ndeploy info <project> --output <file_path>
 ```
 
 ### 6) Ressourcen löschen
@@ -172,7 +172,7 @@ ndeploy remove --all --yes
 ### 7) Orphans finden
 
 ```bash
-ndeploy orphans <workspace> --side <source|target>
+ndeploy orphans <project> --side <source|target>
 ```
 
 Listet Entitäten auf, die von keinem nicht-archivierten Workflow referenziert werden, und gibt Pretty-JSON aus.
@@ -186,20 +186,20 @@ Listet Entitäten auf, die von keinem nicht-archivierten Workflow referenziert w
   - `--data-tables` (Alias: `--datatables`)
   - `--all`
 - Ohne Entitätsfilter wird automatisch `--all` verwendet.
-- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/reports/orphans_<side>.json`
+- Standard-Ausgabedatei (wenn `--output` fehlt): `<project>/reports/orphans_<side>.json`
 
 Beispiele:
 
 ```bash
-ndeploy orphans <workspace> --side target
-ndeploy orphans <workspace> --side source --credentials
-ndeploy orphans <workspace> --side target --workflows --datatables
+ndeploy orphans <project> --side target
+ndeploy orphans <project> --side source --credentials
+ndeploy orphans <project> --side target --workflows --datatables
 ```
 
 ### 8) Dangling References finden
 
 ```bash
-ndeploy dangling-refs <workspace> --side <source|target>
+ndeploy dangling-refs <project> --side <source|target>
 ```
 
 Listet Workflows auf, die Entitäten referenzieren, die nicht mehr existieren.
@@ -214,23 +214,23 @@ Listet Workflows auf, die Entitäten referenzieren, die nicht mehr existieren.
   - `--all`
 - Ohne Filter wird automatisch `--all` verwendet.
 - Alias-Befehl: `ndeploy dangling`
-- Standard-Ausgabedatei (wenn `--output` fehlt): `<workspace>/reports/dangling_<side>.json`
+- Standard-Ausgabedatei (wenn `--output` fehlt): `<project>/reports/dangling_<side>.json`
 
 Beispiele:
 
 ```bash
-ndeploy dangling-refs <workspace> --side target
-ndeploy dangling <workspace> --side source --credentials
-ndeploy dangling-refs <workspace> --side target --workflows --datatables
+ndeploy dangling-refs <project> --side target
+ndeploy dangling <project> --side source --credentials
+ndeploy dangling-refs <project> --side target --workflows --datatables
 ```
 
 ### 9) Credentials-Datei aktualisieren
 
 ```bash
-ndeploy credentials update <workspace>
+ndeploy credentials update <project>
 ```
 
-Erstellt oder aktualisiert `<workspace>/production_credentials.json` aus DEV-Abhängigkeiten des Root-Workflows (rekursive Sub-Workflows).
+Erstellt oder aktualisiert `<project>/production_credentials.json` aus DEV-Abhängigkeiten des Root-Workflows (rekursive Sub-Workflows).
 
 - Wenn die Datei nicht existiert:
   - erstellt alle aktiven Credentials mit vollständigem Template.
@@ -247,34 +247,34 @@ Erstellt oder aktualisiert `<workspace>/production_credentials.json` aus DEV-Abh
 Optional:
 
 ```bash
-ndeploy credentials update <workspace> --fill
+ndeploy credentials update <project> --fill
 ```
 
 ### 10) Credential-Templates validieren
 
 ```bash
-ndeploy credentials validate <workspace>
+ndeploy credentials validate <project>
 ```
 
 Validiert erforderliche Felder aktiver Credentials (`template.required_fields` gegen `template.data`) und gibt einen JSON-Report aus.
-Dieser Befehl ruft keine DEV/PROD-APIs auf und liest nur `<workspace>/production_credentials.json`.
+Dieser Befehl ruft keine DEV/PROD-APIs auf und liest nur `<project>/production_credentials.json`.
 
 Optional:
 
 ```bash
-ndeploy credentials validate <workspace> --output <file_path>
-ndeploy credentials validate <workspace> --strict
+ndeploy credentials validate <project> --output <file_path>
+ndeploy credentials validate <project> --strict
 ```
 
 ## Empfohlener Ablauf
 
-1. `ndeploy create <workflow_id_dev> [workspace_root]`
-2. `ndeploy plan <workspace>`
+1. `ndeploy create <workflow_id_dev> [project_root]`
+2. `ndeploy plan <project>`
 3. `reports/plan_summary.json` prüfen (optional auch `plan.json`).
-4. Credentials-Datei aktualisieren: `ndeploy credentials update <workspace> --fill`
+4. Credentials-Datei aktualisieren: `ndeploy credentials update <project> --fill`
 5. `production_credentials.json` für PROD-Werte prüfen/anpassen.
-6. Credentials validieren: `ndeploy credentials validate <workspace> --strict`
-7. `ndeploy apply <workspace>`
+6. Credentials validieren: `ndeploy credentials validate <project> --strict`
+7. `ndeploy apply <project>`
 8. `reports/deploy_summary.json` prüfen (optional auch `reports/deploy_result.json`).
 9. Root-Workflow manuell veröffentlichen:
    - `ndeploy publish <root_workflow_id_prod>`

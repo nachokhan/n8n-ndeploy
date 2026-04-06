@@ -35,12 +35,12 @@
 
       <h2>Release Checklist</h2>
       <ol>
-        <li>Create workspace from DEV workflow id.</li>
-        <li>Generate a fresh plan in that workspace.</li>
+        <li>Create project from DEV workflow id.</li>
+        <li>Generate a fresh plan in that project.</li>
         <li>Inspect <code>reports/plan_summary.json</code>.</li>
-        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
+        <li>Run <code>ndeploy credentials update &lt;project&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
         <li>Complete or adjust required PROD credential values in each active entry's <code>template.data</code>.</li>
-        <li>Run <code>ndeploy credentials validate &lt;workspace&gt; --strict</code>.</li>
+        <li>Run <code>ndeploy credentials validate &lt;project&gt; --strict</code>.</li>
         <li>Apply plan with normal mode first.</li>
         <li>Inspect <code>reports/deploy_summary.json</code> for executed/skipped/failed actions.</li>
         <li>Publish root workflow explicitly when post-apply checks pass.</li>
@@ -103,15 +103,15 @@
       </p>
 
       <h2>Command Set for Daily Ops</h2>
-      <pre><code>ndeploy create &lt;workflow_id_dev&gt; [workspace_root]
-ndeploy plan &lt;workspace&gt;
-ndeploy credentials update &lt;workspace&gt; --fill --side source
-ndeploy credentials validate &lt;workspace&gt; --strict
-ndeploy apply &lt;workspace&gt;
-ndeploy info &lt;workspace&gt;
+      <pre><code>ndeploy create &lt;workflow_id_dev&gt; [project_root]
+ndeploy plan &lt;project&gt;
+ndeploy credentials update &lt;project&gt; --fill --side source
+ndeploy credentials validate &lt;project&gt; --strict
+ndeploy apply &lt;project&gt;
+ndeploy info &lt;project&gt;
 ndeploy publish &lt;workflow_id_prod&gt;
-ndeploy orphans &lt;workspace&gt; --side target
-ndeploy dangling-refs &lt;workspace&gt; --side target</code></pre>
+ndeploy orphans &lt;project&gt; --side target
+ndeploy dangling-refs &lt;project&gt; --side target</code></pre>
     </main>
   </div>
 </body>

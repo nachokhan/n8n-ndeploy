@@ -32,7 +32,7 @@ export interface DeployResult {
   metadata: {
     run_id: string;
     plan_id: string;
-    workspace: string;
+    project: string;
     started_at: string;
     finished_at: string;
     force_update: boolean;

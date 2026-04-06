@@ -5,11 +5,11 @@ import { N8nClient } from "../services/N8nClient.js";
 import { ValidationError } from "../errors/index.js";
 import { loadEnv } from "../utils/env.js";
 import {
-  WorkspaceMetadata,
-  ensureWorkspaceDir,
+  ProjectMetadata,
+  ensureProjectDir,
   fileExists,
   readJsonFile,
-  resolveWorkspaceMetadataFilePath,
+  resolveProjectMetadataFilePath,
   writeJsonFile,
 } from "../utils/file.js";
 import { logger } from "../utils/logger.js";
@@ -23,45 +23,45 @@ export function registerNCreateCommand(program: Command): void {
     .command("create")
     .argument("<workflow_id_dev>", "Workflow ID in DEV")
     .argument(
-      "[workspace_root]",
-      "Base directory where workspace folder will be created",
+      "[project_root]",
+      "Base directory where project folder will be created",
       ".",
     )
-    .option("--force", "Re-initialize workspace.json when it already exists")
-    .description("Create workspace from DEV workflow and initialize workspace.json")
+    .option("--force", "Re-initialize project.json when it already exists")
+    .description("Create project from DEV workflow and initialize project.json")
     .action(
       async (
         workflowIdDev: string,
-        workspaceRoot: string,
+        projectRoot: string,
         options: CreateCommandOptions,
       ) => {
-      const spinner = ora("Preparing workspace creation").start();
+      const spinner = ora("Preparing project creation").start();
       try {
         const env = loadEnv();
         const devClient = new N8nClient(env.N8N_DEV_URL, env.N8N_DEV_API_KEY);
         const workflow = await devClient.getWorkflowById(workflowIdDev);
-        const workspaceName = normalizeWorkspaceName(workflow.name);
-        const workspaceDir = path.resolve(process.cwd(), workspaceRoot, workspaceName);
-        const workspace = path.relative(process.cwd(), workspaceDir) || ".";
+        const projectName = normalizeProjectName(workflow.name);
+        const projectDir = path.resolve(process.cwd(), projectRoot, projectName);
+        const project = path.relative(process.cwd(), projectDir) || ".";
 
-        await ensureWorkspaceDir(workspaceDir);
-        const metadataPath = resolveWorkspaceMetadataFilePath(workspace);
+        await ensureProjectDir(projectDir);
+        const metadataPath = resolveProjectMetadataFilePath(project);
         const alreadyInitialized = await fileExists(metadataPath);
 
         if (alreadyInitialized && options.force !== true) {
           throw new ValidationError(
-            `Workspace "${workspace}" already initialized. Use --force to re-initialize.`,
+            `Project "${project}" already initialized. Use --force to re-initialize.`,
           );
         }
 
         const now = new Date().toISOString();
         const existingMetadata = alreadyInitialized
-          ? await tryReadWorkspaceMetadata(metadataPath)
+          ? await tryReadProjectMetadata(metadataPath)
           : null;
-        const metadata: WorkspaceMetadata = {
+        const metadata: ProjectMetadata = {
           schema_version: 1,
-          workspace,
-          name: workspaceName,
+          project,
+          name: projectName,
           plan: {
             root_workflow_id_dev: workflow.id,
             root_workflow_name: workflow.name,
@@ -74,34 +74,34 @@ export function registerNCreateCommand(program: Command): void {
         await writeJsonFile(metadataPath, metadata);
 
         if (alreadyInitialized) {
-          spinner.succeed("Workspace re-initialized");
-          logger.warn(`[NCREATE] Workspace re-initialized: ${workspaceDir}`);
+          spinner.succeed("Project re-initialized");
+          logger.warn(`[NCREATE] Project re-initialized: ${projectDir}`);
         } else {
-          spinner.succeed("Workspace created");
-          logger.success(`[NCREATE] Workspace created: ${workspaceDir}`);
+          spinner.succeed("Project created");
+          logger.success(`[NCREATE] Project created: ${projectDir}`);
         }
         logger.info(`[NCREATE] root_workflow_id=${workflow.id}`);
         logger.info(`[NCREATE] root_workflow_name=${workflow.name}`);
         logger.success(`[NCREATE] Metadata file: ${metadataPath}`);
       } catch (error) {
         if (spinner.isSpinning) {
-          spinner.fail("Workspace creation failed");
+          spinner.fail("Project creation failed");
         }
         throw error;
       }
     });
 }
 
-async function tryReadWorkspaceMetadata(metadataPath: string): Promise<WorkspaceMetadata | null> {
+async function tryReadProjectMetadata(metadataPath: string): Promise<ProjectMetadata | null> {
   try {
-    const metadata = await readJsonFile<WorkspaceMetadata>(metadataPath);
+    const metadata = await readJsonFile<ProjectMetadata>(metadataPath);
     return metadata;
   } catch {
     return null;
   }
 }
 
-function normalizeWorkspaceName(workflowName: string): string {
+function normalizeProjectName(workflowName: string): string {
   const sanitized = workflowName
     .trim()
     .replaceAll(/[\\/]/g, "-")

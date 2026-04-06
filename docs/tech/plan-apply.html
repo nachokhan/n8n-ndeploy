@@ -36,7 +36,7 @@
 
       <h2>Plan Phase: What It Produces</h2>
       <p>
-        <code>ndeploy plan &lt;workspace&gt;</code> creates plan artifacts inside the workspace.
+        <code>ndeploy plan &lt;project&gt;</code> creates plan artifacts inside the project.
       </p>
       <ul>
         <li><code>plan.json</code>: full plan with metadata and ordered actions.</li>
@@ -47,9 +47,9 @@
         <li>Workflow payload snapshots and DEV freshness checksums.</li>
       </ul>
       <p>
-        Credential manifests are managed separately with <code>ndeploy credentials update &lt;workspace&gt; [--fill] [--side source|target]</code>,
+        Credential manifests are managed separately with <code>ndeploy credentials update &lt;project&gt; [--fill] [--side source|target]</code>,
         which creates or updates <code>production_credentials.json</code>. Use
-        <code>ndeploy credentials validate &lt;workspace&gt; --strict</code> before apply to confirm required fields are ready.
+        <code>ndeploy credentials validate &lt;project&gt; --strict</code> before apply to confirm required fields are ready.
       </p>
 
       <h3>Action Semantics</h3>
@@ -89,7 +89,7 @@
 
       <h2>Apply Phase: Runtime Source of Truth</h2>
       <p>
-        <code>ndeploy apply &lt;workspace&gt;</code> validates and executes. Runtime state may differ from plan-generation state,
+        <code>ndeploy apply &lt;project&gt;</code> validates and executes. Runtime state may differ from plan-generation state,
         so apply re-checks what must be true before writing.
       </p>
       <ol>
@@ -99,7 +99,7 @@
         <li>Load reviewed credential manifest values from <code>production_credentials.json</code>.</li>
         <li>Execute actions in dependency-safe order.</li>
         <li>Patch references with resolved ID mappings before workflow writes.</li>
-        <li>Write <code>reports/deploy_result.json</code> and <code>reports/deploy_summary.json</code> in the workspace.</li>
+        <li>Write <code>reports/deploy_result.json</code> and <code>reports/deploy_summary.json</code> in the project.</li>
       </ol>
 
       <p>

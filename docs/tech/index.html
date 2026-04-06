@@ -36,8 +36,8 @@
 
       <h2>Core Model</h2>
       <ul>
-        <li><strong>Create phase:</strong> initializes a workspace from a DEV workflow id and stores root workflow metadata.</li>
-        <li><strong>Plan phase:</strong> discovers dependencies and builds plan artifacts inside the workspace.</li>
+        <li><strong>Create phase:</strong> initializes a project from a DEV workflow id and stores root workflow metadata.</li>
+        <li><strong>Plan phase:</strong> discovers dependencies and builds plan artifacts inside the project.</li>
         <li><strong>Apply phase:</strong> validates plan freshness, executes actions in dependency order, and writes runtime results.</li>
         <li><strong>Publish phase:</strong> explicitly activates workflows after verification.</li>
       </ul>
@@ -86,12 +86,12 @@
 
       <h2>Recommended Operational Sequence</h2>
       <ol>
-        <li>Create workspace: <code>ndeploy create &lt;workflow_id_dev&gt; [workspace_root]</code></li>
-        <li>Generate plan: <code>ndeploy plan &lt;workspace&gt;</code></li>
+        <li>Create project: <code>ndeploy create &lt;workflow_id_dev&gt; [project_root]</code></li>
+        <li>Generate plan: <code>ndeploy plan &lt;project&gt;</code></li>
         <li>Review <code>reports/plan_summary.json</code> (plus <code>plan.json</code> if needed).</li>
-        <li>Run <code>ndeploy credentials update &lt;workspace&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
-        <li>Run <code>ndeploy credentials validate &lt;workspace&gt; --strict</code> before apply.</li>
-        <li>Apply plan: <code>ndeploy apply &lt;workspace&gt;</code></li>
+        <li>Run <code>ndeploy credentials update &lt;project&gt; --fill [--side source|target]</code> and review <code>production_credentials.json</code>.</li>
+        <li>Run <code>ndeploy credentials validate &lt;project&gt; --strict</code> before apply.</li>
+        <li>Apply plan: <code>ndeploy apply &lt;project&gt;</code></li>
         <li>Review <code>reports/deploy_summary.json</code> (and <code>reports/deploy_result.json</code> if needed).</li>
         <li>Publish root workflow manually when release criteria are met.</li>
       </ol>

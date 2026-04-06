@@ -47,7 +47,7 @@
             Deploy n8n workflows <br> from <span class="text-gradient">DEV to PROD</span>
         </h1>
         <p class="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto mb-10">
-            Deterministic workspace-first CLI for promoting n8n releases from DEV to PROD.
+            Deterministic project-first CLI for promoting n8n releases from DEV to PROD.
             Plan dependencies, prepare production credentials, validate them, and apply with full operator control.
         </p>
         <div class="flex flex-col md:flex-row gap-4 justify-center">
@@ -111,22 +111,22 @@
                 <div class="flex gap-8 items-start">
                     <div class="bg-pink-500 text-white font-bold rounded-full h-10 w-10 flex items-center justify-center shrink-0">1</div>
                     <div>
-                        <h4 class="text-xl font-bold text-white mb-2">Create Workspace</h4>
-                        <p class="text-slate-400">Run <code class="text-pink-400 font-mono">create</code> with a DEV workflow id to create a workspace folder and persist root workflow metadata.</p>
+                        <h4 class="text-xl font-bold text-white mb-2">Create Project</h4>
+                        <p class="text-slate-400">Run <code class="text-pink-400 font-mono">create</code> with a DEV workflow id to create a project folder and persist root workflow metadata.</p>
                     </div>
                 </div>
                 <div class="flex gap-8 items-start">
                     <div class="bg-purple-500 text-white font-bold rounded-full h-10 w-10 flex items-center justify-center shrink-0">2</div>
                     <div>
                         <h4 class="text-xl font-bold text-white mb-2">Plan & Review</h4>
-                        <p class="text-slate-400">Run <code class="text-purple-400 font-mono">plan &lt;workspace&gt;</code>, review <code class="text-purple-400 font-mono">reports/plan_summary.json</code>, then run <code class="text-purple-400 font-mono">credentials update &lt;workspace&gt; --fill</code> and <code class="text-purple-400 font-mono">credentials validate &lt;workspace&gt; --strict</code>.</p>
+                        <p class="text-slate-400">Run <code class="text-purple-400 font-mono">plan &lt;project&gt;</code>, review <code class="text-purple-400 font-mono">reports/plan_summary.json</code>, then run <code class="text-purple-400 font-mono">credentials update &lt;project&gt; --fill</code> and <code class="text-purple-400 font-mono">credentials validate &lt;project&gt; --strict</code>.</p>
                     </div>
                 </div>
                 <div class="flex gap-8 items-start">
                     <div class="bg-cyan-500 text-white font-bold rounded-full h-10 w-10 flex items-center justify-center shrink-0">3</div>
                     <div>
                         <h4 class="text-xl font-bold text-white mb-2">Apply & Publish</h4>
-                        <p class="text-slate-400">Deploy with <code class="text-cyan-400 font-mono">apply &lt;workspace&gt;</code>, inspect <code class="text-cyan-400 font-mono">reports/deploy_summary.json</code>, then manually <code class="text-cyan-400 font-mono">publish</code> root workflow.</p>
+                        <p class="text-slate-400">Deploy with <code class="text-cyan-400 font-mono">apply &lt;project&gt;</code>, inspect <code class="text-cyan-400 font-mono">reports/deploy_summary.json</code>, then manually <code class="text-cyan-400 font-mono">publish</code> root workflow.</p>
                     </div>
                 </div>
             </div>
@@ -142,28 +142,28 @@
         
         <div class="space-y-6 font-mono">
             <div class="code-block p-6 rounded-xl">
-                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">1. Create workspace from DEV workflow</p>
-                <code class="text-pink-400 text-lg">ndeploy create &lt;workflow_id_dev&gt; [workspace_root]</code>
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">1. Create project from DEV workflow</p>
+                <code class="text-pink-400 text-lg">ndeploy create &lt;workflow_id_dev&gt; [project_root]</code>
             </div>
             <div class="code-block p-6 rounded-xl">
-                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">2. Generate plan in workspace</p>
-                <code class="text-purple-400 text-lg">ndeploy plan &lt;workspace&gt;</code>
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">2. Generate plan in project</p>
+                <code class="text-purple-400 text-lg">ndeploy plan &lt;project&gt;</code>
             </div>
             <div class="code-block p-6 rounded-xl">
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">3. Prepare credential manifest</p>
-                <code class="text-cyan-400 text-lg">ndeploy credentials update &lt;workspace&gt; --fill --side source</code>
+                <code class="text-cyan-400 text-lg">ndeploy credentials update &lt;project&gt; --fill --side source</code>
             </div>
             <div class="code-block p-6 rounded-xl">
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">4. Validate credential readiness</p>
-                <code class="text-amber-300 text-lg">ndeploy credentials validate &lt;workspace&gt; --strict</code>
+                <code class="text-amber-300 text-lg">ndeploy credentials validate &lt;project&gt; --strict</code>
             </div>
             <div class="code-block p-6 rounded-xl">
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">5. Apply to production</p>
-                <code class="text-emerald-300 text-lg">ndeploy apply &lt;workspace&gt;</code>
+                <code class="text-emerald-300 text-lg">ndeploy apply &lt;project&gt;</code>
             </div>
             <div class="code-block p-6 rounded-xl">
-                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">6. Inspect workspace status</p>
-                <code class="text-rose-300 text-lg">ndeploy info &lt;workspace&gt;</code>
+                <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">6. Inspect project status</p>
+                <code class="text-rose-300 text-lg">ndeploy info &lt;project&gt;</code>
             </div>
             <div class="code-block p-6 rounded-xl">
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">7. Manual activation</p>
@@ -171,7 +171,7 @@
             </div>
             <div class="code-block p-6 rounded-xl">
                 <p class="text-xs font-bold text-slate-500 uppercase mb-2 tracking-widest font-sans">8. Find orphans / dangling refs</p>
-                <code class="text-rose-300 text-lg">ndeploy orphans &lt;workspace&gt; --side target && ndeploy dangling-refs &lt;workspace&gt; --side target</code>
+                <code class="text-rose-300 text-lg">ndeploy orphans &lt;project&gt; --side target && ndeploy dangling-refs &lt;project&gt; --side target</code>
             </div>
         </div>
     </section>

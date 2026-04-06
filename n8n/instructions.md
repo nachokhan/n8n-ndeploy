@@ -3,7 +3,7 @@
 This folder contains a generic workflow template for the optional fallback used by:
 
 ```bash
-ndeploy credentials update <workspace> --fill
+ndeploy credentials update <project> --fill
 ```
 
 The idea is simple:
@@ -180,7 +180,7 @@ N8N_DEV_CREDENTIAL_EXPORT_TOKEN=your-token-here
 Then run:
 
 ```bash
-ndeploy credentials update <workspace> --fill
+ndeploy credentials update <project> --fill
 ```
 
 ## Security Notes

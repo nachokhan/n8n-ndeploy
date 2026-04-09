@@ -20,9 +20,15 @@ Antes de ejecutar comandos, verifica:
 
 1. Tener Node.js 18+.
 2. Tener acceso API a DEV y PROD de n8n.
-3. Tener `.env` configurado en la raíz del proyecto.
+3. Tener runtime configurado.
 
-Ejemplo de `.env`:
+Configuración recomendada:
+
+1. Crear `~/.ndeploy/profiles.json`.
+2. Tomar [`profiles.example.json`](./profiles.example.json) como plantilla.
+3. Mantener ese archivo fuera de versionado porque es privado del operador.
+
+Compatibilidad legacy:
 
 ```env
 N8N_DEV_URL=https://tu-dev
@@ -51,21 +57,23 @@ Con eso puedes usar `ndeploy` sin `npm run`.
 ## 4.1 Crear project
 
 ```bash
-ndeploy init <workflow_id_dev> [project_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
 Resultado esperado:
 
-1. Se crea la carpeta del project usando el nombre del workflow en DEV.
+1. Se crea la carpeta del project usando el nombre del workflow en source.
 2. Se inicializa `<project>/project.json` con metadata base.
 3. Queda configurado el root workflow en `project.json` (`plan.root_workflow_id_dev` y `plan.root_workflow_name`).
 4. Si pasas `--force`, se re-inicializa `project.json` existente.
 5. `project_root` es opcional para indicar dónde crear la carpeta (por defecto, directorio actual).
+6. `--profile <name>` guarda `deploy.profile` en `project.json`.
+7. `ndeploy init` queda como alias compatible.
 
 ## 4.2 Generar plan
 
 ```bash
-ndeploy plan <project>
+ndeploy plan [project]
 ```
 
 Resultado esperado:
@@ -77,13 +85,13 @@ Resultado esperado:
 
 Importante:
 
-1. `ndeploy plan <project>` usa el workflow root guardado en `<project>/project.json`.
+1. `ndeploy plan [project]` usa el workflow root guardado en `project.json`.
 2. Si no hay workflow root configurado, el comando falla y te pedirá crear/configurar el project.
 
 ## 4.3 Aplicar plan
 
 ```bash
-ndeploy apply <project>
+ndeploy apply [project]
 ```
 
 Resultado esperado:
@@ -98,7 +106,7 @@ Resultado esperado:
 ## 4.4 Publicar manualmente
 
 ```bash
-ndeploy publish <workflow_id_prod>
+ndeploy publish <workflow_id_prod> [--profile <name>]
 ```
 
 Uso típico:
@@ -266,15 +274,16 @@ Reglas:
 1. Crear project:
 
 ```bash
-ndeploy init YI2AqhHvG8gfsyM2 tmp
+ndeploy create YI2AqhHvG8gfsyM2 tmp
 ```
 
-2. Tomar el folder generado (basado en el nombre del workflow, normalizado).
+2. Entrar al folder generado (basado en el nombre del workflow, normalizado).
 
 3. Generar plan:
 
 ```bash
-ndeploy plan <project_generado>
+cd <project_generado>
+ndeploy plan
 ```
 
 4. Revisar `reports/plan_summary.json` (y `plan.json` si necesitas detalle total).
@@ -282,19 +291,19 @@ ndeploy plan <project_generado>
 5. Obtener snapshots:
 
 ```bash
-ndeploy credentials fetch <project_generado>
+ndeploy credentials fetch
 ```
 
 6. Comparar source y target:
 
 ```bash
-ndeploy credentials compare <project_generado>
+ndeploy credentials compare
 ```
 
 7. Agregar faltantes al manifest:
 
 ```bash
-ndeploy credentials merge-missing <project_generado>
+ndeploy credentials merge-missing
 ```
 
 8. Revisar/ajustar `credentials_manifest.json` con valores correctos de PROD.
@@ -302,13 +311,13 @@ ndeploy credentials merge-missing <project_generado>
 9. Validar credenciales:
 
 ```bash
-ndeploy credentials validate <project_generado> --side manifest --strict
+ndeploy credentials validate --side manifest --strict
 ```
 
 10. Aplicar el plan:
 
 ```bash
-ndeploy apply <project_generado>
+ndeploy apply
 ```
 
 11. Revisar `reports/deploy_summary.json` (y `reports/deploy_result.json` si necesitas auditoría completa).
@@ -485,6 +494,7 @@ ndeploy --help
 
 # Ayuda de subcomandos
 ndeploy plan --help
+ndeploy create --help
 ndeploy init --help
 ndeploy apply --help
 ndeploy publish --help
@@ -494,12 +504,13 @@ ndeploy orphans --help
 ndeploy dangling-refs --help
 
 # Flujo base
-ndeploy init <workflow_id_dev> [project_root]
-ndeploy plan <project>
-ndeploy apply <project>
-ndeploy info <project>
+ndeploy create <workflow_id_dev> [project_root]
+cd <project>
+ndeploy plan
+ndeploy apply
+ndeploy info
 ndeploy publish <workflow_id_prod>
 ndeploy remove --all --yes
-ndeploy orphans <project> --side target
-ndeploy dangling-refs <project> --side target
+ndeploy orphans --side target
+ndeploy dangling-refs --side target
 ```

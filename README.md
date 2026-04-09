@@ -61,24 +61,30 @@ ndeploy --help
 
 This is enough after pulling new changes, even on Ubuntu, as long as the server is running Node.js 18 or newer.
 
-### 4) Configure Environment Variables
+### 4) Configure Runtime
 
-Create `.env` (or copy from `.env.example`):
+Preferred setup: create `~/.ndeploy/profiles.json` using [`profiles.example.json`](./profiles.example.json)
+as a template. Profiles are private to the operator and should not be versioned.
 
-```env
-N8N_DEV_URL=http://localhost:5678
-N8N_DEV_API_KEY=dev_api_key
-N8N_PROD_URL=http://localhost:5679
-N8N_PROD_API_KEY=prod_api_key
-# Optional fallback for credentials fill:
-# N8N webhook endpoint that returns credential data by requested ids
-N8N_DEV_CREDENTIAL_EXPORT_URL=
-# Bearer token for that endpoint
-N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
-# Optional fallback when fetching target credential snapshots
-N8N_PROD_CREDENTIAL_EXPORT_URL=
-N8N_PROD_CREDENTIAL_EXPORT_TOKEN=
+```json
+{
+  "schema_version": 1,
+  "profiles": {
+    "dev-to-prod": {
+      "source": {
+        "url": "https://dev.example.com",
+        "api_key": "dev_api_key"
+      },
+      "target": {
+        "url": "https://prod.example.com",
+        "api_key": "prod_api_key"
+      }
+    }
+  }
+}
 ```
+
+Legacy compatibility is still available through `.env` (see [`.env.example`](./.env.example)).
 
 ### 5) First Smoke Test
 
@@ -91,7 +97,7 @@ ndeploy --help
 Then you can start with:
 
 ```bash
-ndeploy init <workflow_id_dev> [project_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
 ## Did this app help you?
@@ -123,41 +129,46 @@ If this app was useful to you, you can buy me a flat white or expresso as a than
 
 ## Commands
 
-### 1) Init Project
+### 1) Create Project
 
 ```bash
-ndeploy init <workflow_id_dev> [project_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
 Creates the project directory from the DEV workflow name and initializes `project.json`.
 Optional `project_root` lets you choose where that folder is created (default: current directory).
 Use `--force` to re-initialize metadata if the target project already exists.
+Use `--profile <name>` to persist a profile into `project.json`.
+`ndeploy init` remains available as a compatibility alias.
 
 ### 2) Generate Plan
 
 ```bash
-ndeploy plan <project>
+ndeploy plan [project]
 ```
 
 Uses the root workflow configured in `<project>/project.json`.
+If `project` is omitted, the current directory is used.
 Creates:
 - `<project>/plan.json`
 - `<project>/reports/plan_summary.json`
 
 If `plan.json` already exists, it's backed up as `plan_backup_<timestamp>.json`.
 
-`ndeploy init` stores root workflow information in `project.json`:
+`ndeploy create` stores root workflow information in `project.json`:
 - `plan.root_workflow_id_dev`
 - `plan.root_workflow_name`
 - `plan.updated_at`
+- `deploy.profile` (when a profile is selected)
 
 ### 3) Apply Plan
 
 ```bash
-ndeploy apply <project>
+ndeploy apply [project]
 ```
 
 Executes the plan in PROD (credentials, data tables, workflows).
+If `project` is omitted, the current directory is used.
 Writes:
 - `<project>/reports/deploy_result.json`
 - `<project>/reports/deploy_summary.json`
@@ -173,7 +184,7 @@ ndeploy apply <project> --force-update
 ### 4) Manual Publish
 
 ```bash
-ndeploy publish <workflow_id_prod>
+ndeploy publish <workflow_id_prod> [--profile <name>]
 ```
 
 Manual publish command for root workflow (or any workflow) in PROD.
@@ -347,17 +358,18 @@ ndeploy credentials validate <project> --output <file_path>
 
 ## Recommended Flow
 
-1. `ndeploy init <workflow_id_dev> [project_root]`
-2. `ndeploy plan <project>`
-3. Review `reports/plan_summary.json` (and `plan.json` if needed).
-4. Fetch snapshots: `ndeploy credentials fetch <project>`
-5. Compare source and target: `ndeploy credentials compare <project>`
-6. Merge missing entries into the manifest: `ndeploy credentials merge-missing <project>`
-7. Review/adjust `credentials_manifest.json` for PROD values.
-8. Validate the manifest: `ndeploy credentials validate <project> --side manifest --strict`
-9. `ndeploy apply <project>`
-10. Review `reports/deploy_summary.json` (and `reports/deploy_result.json` if needed).
-11. Human/manual publish of root workflow:
+1. `ndeploy create <workflow_id_dev> [project_root]`
+2. `cd <project>`
+3. `ndeploy plan`
+4. Review `reports/plan_summary.json` (and `plan.json` if needed).
+5. Fetch snapshots: `ndeploy credentials fetch`
+6. Compare source and target: `ndeploy credentials compare`
+7. Merge missing entries into the manifest: `ndeploy credentials merge-missing`
+8. Review/adjust `credentials_manifest.json` for PROD values.
+9. Validate the manifest: `ndeploy credentials validate --side manifest --strict`
+10. `ndeploy apply`
+11. Review `reports/deploy_summary.json` (and `reports/deploy_result.json` if needed).
+12. Human/manual publish of root workflow:
    - `ndeploy publish <root_workflow_id_prod>`
 
 ## Important Behavior

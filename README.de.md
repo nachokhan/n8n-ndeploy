@@ -52,19 +52,12 @@ Danach kann `ndeploy ...` direkt genutzt werden.
 
 ## Konfiguration
 
-`.env` erstellen (oder `.env.example` kopieren):
+Bevorzugtes Setup: `~/.ndeploy/profiles.json` anhand von
+[`profiles.example.json`](./profiles.example.json) anlegen. Profile sind privat
+für den Operator und sollten nicht versioniert werden.
 
-```env
-N8N_DEV_URL=http://localhost:5678
-N8N_DEV_API_KEY=dev_api_key
-N8N_PROD_URL=http://localhost:5679
-N8N_PROD_API_KEY=prod_api_key
-# Optionaler Fallback für Credential-Fill:
-# n8n-Webhook-Endpunkt, der Credential-Daten anhand angeforderter IDs zurückgibt
-N8N_DEV_CREDENTIAL_EXPORT_URL=
-# Bearer-Token für diesen Endpunkt
-N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
-```
+Die bisherige `.env`-Variante bleibt als Legacy-Kompatibilität verfügbar
+(siehe [`.env.example`](./.env.example)).
 
 ## Schnellüberblick
 
@@ -72,20 +65,21 @@ N8N_DEV_CREDENTIAL_EXPORT_TOKEN=
 
 ## Befehle
 
-### 1) Project initialisieren
+### 1) Project anlegen
 
 ```bash
-ndeploy init <workflow_id_dev> [project_root]
+ndeploy create <workflow_id_dev> [project_root]
 ```
 
 Erstellt den Project-Ordner auf Basis des Workflow-Namens in DEV und initialisiert `project.json`.
 Mit optionalem `project_root` kann das Zielverzeichnis gewählt werden (Standard: aktuelles Verzeichnis).
 Mit `--force` wird die Metadata neu initialisiert, wenn der Project bereits existiert.
+`ndeploy init` bleibt als Kompatibilitäts-Alias verfügbar.
 
 ### 2) Plan erzeugen
 
 ```bash
-ndeploy plan <project>
+ndeploy plan [project]
 ```
 
 Verwendet den in `<project>/project.json` konfigurierten Root-Workflow.
@@ -95,7 +89,7 @@ Erzeugt:
 
 Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp>.json` erstellt.
 
-`ndeploy init` schreibt die Root-Workflow-Konfiguration in `project.json`:
+`ndeploy create` schreibt die Root-Workflow-Konfiguration in `project.json`:
 - `plan.root_workflow_id_dev`
 - `plan.root_workflow_name`
 - `plan.updated_at`
@@ -103,7 +97,7 @@ Falls `plan.json` bereits existiert, wird ein Backup als `plan_backup_<timestamp
 ### 3) Plan anwenden
 
 ```bash
-ndeploy apply <project>
+ndeploy apply [project]
 ```
 
 Führt den Plan in PROD aus (Credentials, Data Tables, Workflows).
@@ -122,7 +116,7 @@ ndeploy apply <project> --force-update
 ### 4) Manuell veröffentlichen
 
 ```bash
-ndeploy publish <workflow_id_prod>
+ndeploy publish <workflow_id_prod> [--profile <name>]
 ```
 
 Manueller Publish-Befehl für Root-Workflow (oder beliebigen Workflow) in PROD.

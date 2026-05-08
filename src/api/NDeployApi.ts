@@ -203,22 +203,106 @@ export class NDeployApi {
       fileExists(deployResultPath), fileExists(deploySummaryPath),
     ]);
 
+    const metadata = metadataExists
+      ? await readJsonFile<Record<string, unknown>>(metadataPath)
+      : null;
+    const plan = planExists ? await readJsonFile<Record<string, unknown>>(planPath) : null;
+    const planSummary = planSummaryExists
+      ? await readJsonFile<Record<string, unknown>>(planSummaryPath)
+      : null;
+    const credentialsSource = credentialsSourceExists
+      ? await readJsonFile<Record<string, unknown>>(credentialsSourcePath)
+      : null;
+    const credentialsTarget = credentialsTargetExists
+      ? await readJsonFile<Record<string, unknown>>(credentialsTargetPath)
+      : null;
+    const credentialsManifest = credentialsManifestExists
+      ? await readJsonFile<Record<string, unknown>>(credentialsManifestPath)
+      : null;
+    const deployResult = deployResultExists
+      ? await readJsonFile<Record<string, unknown>>(deployResultPath)
+      : null;
+    const deploySummary = deploySummaryExists
+      ? await readJsonFile<Record<string, unknown>>(deploySummaryPath)
+      : null;
+
     const output = {
       project,
       project_path: path.resolve(project),
-      artifacts: {
-        plan: { exists: planExists, path: planPath },
-        plan_summary: { exists: planSummaryExists, path: planSummaryPath },
-        credentials_source: { exists: credentialsSourceExists, path: credentialsSourcePath },
-        credentials_target: { exists: credentialsTargetExists, path: credentialsTargetPath },
-        credentials_manifest: { exists: credentialsManifestExists, path: credentialsManifestPath },
-        deploy_result: { exists: deployResultExists, path: deployResultPath },
-        deploy_summary: { exists: deploySummaryExists, path: deploySummaryPath },
-      },
       metadata: {
         exists: metadataExists,
         path: metadataPath,
-        data: metadataExists ? await readJsonFile<unknown>(metadataPath) : null,
+        schema_version: getNumber(metadata, "schema_version"),
+        name: getString(metadata, "name"),
+        created_at: getString(metadata, "created_at"),
+        updated_at: getString(metadata, "updated_at"),
+        plan: {
+          root_workflow_id_source: getNestedString(metadata, ["plan", "root_workflow_id_source"]),
+          root_workflow_name: getNestedString(metadata, ["plan", "root_workflow_name"]),
+          updated_at: getNestedString(metadata, ["plan", "updated_at"]),
+        },
+        deploy: {
+          profile: getNestedString(metadata, ["deploy", "profile"]),
+          updated_at: getNestedString(metadata, ["deploy", "updated_at"]),
+        },
+      },
+      artifacts: {
+        plan: {
+          exists: planExists,
+          path: planPath,
+          actions: getArrayLength(plan, "actions"),
+          plan_id: getNestedString(plan, ["metadata", "plan_id"]),
+          generated_at: getNestedString(plan, ["metadata", "generated_at"]),
+        },
+        plan_summary: {
+          exists: planSummaryExists,
+          path: planSummaryPath,
+          actions: getNestedNumber(planSummary, ["totals", "actions"]),
+          plan_id: getNestedString(planSummary, ["metadata", "plan_id"]),
+          generated_at: getNestedString(planSummary, ["metadata", "generated_at"]),
+        },
+        credentials_source: {
+          exists: credentialsSourceExists,
+          path: credentialsSourcePath,
+          schema_version: getNestedNumber(credentialsSource, ["metadata", "schema_version"]),
+          credentials: getArrayLength(credentialsSource, "credentials"),
+          generated_at: getNestedString(credentialsSource, ["metadata", "generated_at"]),
+        },
+        credentials_target: {
+          exists: credentialsTargetExists,
+          path: credentialsTargetPath,
+          schema_version: getNestedNumber(credentialsTarget, ["metadata", "schema_version"]),
+          credentials: getArrayLength(credentialsTarget, "credentials"),
+          generated_at: getNestedString(credentialsTarget, ["metadata", "generated_at"]),
+        },
+        credentials_manifest: {
+          exists: credentialsManifestExists,
+          path: credentialsManifestPath,
+          schema_version: getNestedNumber(credentialsManifest, ["metadata", "schema_version"]),
+          credentials: getArrayLength(credentialsManifest, "credentials"),
+          root_workflow_id_source: getNestedString(credentialsManifest, ["metadata", "root_workflow_id_source"]),
+          updated_at: getNestedString(credentialsManifest, ["metadata", "updated_at"]),
+        },
+        deploy_result: {
+          exists: deployResultExists,
+          path: deployResultPath,
+          run_id: getNestedString(deployResult, ["metadata", "run_id"]),
+          started_at: getNestedString(deployResult, ["metadata", "started_at"]),
+          finished_at: getNestedString(deployResult, ["metadata", "finished_at"]),
+          executed: getNestedNumber(deployResult, ["totals", "executed"]),
+          skipped: getNestedNumber(deployResult, ["totals", "skipped"]),
+          failed: getNestedNumber(deployResult, ["totals", "failed"]),
+        },
+        deploy_summary: {
+          exists: deploySummaryExists,
+          path: deploySummaryPath,
+          run_id: getNestedString(deploySummary, ["metadata", "run_id"]),
+          started_at: getNestedString(deploySummary, ["metadata", "started_at"]),
+          finished_at: getNestedString(deploySummary, ["metadata", "finished_at"]),
+          executed: getNestedNumber(deploySummary, ["totals", "executed"]),
+          skipped: getNestedNumber(deploySummary, ["totals", "skipped"]),
+          failed: getNestedNumber(deploySummary, ["totals", "failed"]),
+        },
       },
     };
 
@@ -786,6 +870,52 @@ export class NDeployApi {
     if (target === "credentials") return this.targetClient.listCredentialIds();
     return this.targetClient.listDataTableIds();
   }
+}
+
+function getArrayLength(data: Record<string, unknown> | null, key: string): number | null {
+  if (!data) return null;
+  const value = data[key];
+  return Array.isArray(value) ? value.length : null;
+}
+
+function getString(data: Record<string, unknown> | null, key: string): string | null {
+  if (!data) return null;
+  const value = data[key];
+  return typeof value === "string" ? value : null;
+}
+
+function getNumber(data: Record<string, unknown> | null, key: string): number | null {
+  if (!data) return null;
+  const value = data[key];
+  return typeof value === "number" ? value : null;
+}
+
+function getNestedString(
+  data: Record<string, unknown> | null,
+  pathParts: string[],
+): string | null {
+  const value = getNestedValue(data, pathParts);
+  return typeof value === "string" ? value : null;
+}
+
+function getNestedNumber(
+  data: Record<string, unknown> | null,
+  pathParts: string[],
+): number | null {
+  const value = getNestedValue(data, pathParts);
+  return typeof value === "number" ? value : null;
+}
+
+function getNestedValue(
+  data: Record<string, unknown> | null,
+  pathParts: string[],
+): unknown {
+  let current: unknown = data;
+  for (const key of pathParts) {
+    if (!current || typeof current !== "object" || Array.isArray(current)) return null;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return current;
 }
 
 async function tryRead<T>(filePath: string): Promise<T | null> {

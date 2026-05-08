@@ -3,19 +3,12 @@ import { createInterface } from "node:readline/promises";
 import ora from "ora";
 import { Command } from "commander";
 import { N8nClient } from "../services/N8nClient.js";
-import { writeJsonFile } from "../utils/file.js";
 import { logger } from "../utils/logger.js";
 import { ValidationError } from "../errors/index.js";
+import { buildApiFromRuntime } from "./apiFactory.js";
 import { resolveRuntimeConfig } from "../utils/runtime.js";
 
-type TargetSelection =
-  | {
-      mode: "all";
-    }
-  | {
-      mode: "ids";
-      ids: string[];
-    };
+type TargetSelection = { mode: "all" } | { mode: "ids"; ids: string[] };
 
 interface RemoveCommandOptions {
   profile?: string;
@@ -47,9 +40,7 @@ export function registerNRemoveCommand(program: Command): void {
     .action(async (options: RemoveCommandOptions) => {
       const spinner = ora("Preparing remove execution").start();
       try {
-        const runtime = await resolveRuntimeConfig({ profile: options.profile });
-        const targetClient = new N8nClient(runtime.target.url, runtime.target.apiKey);
-
+        const { api } = await buildApiFromRuntime({ profile: options.profile });
         let workflowsSelection = parseTargetSelection(options.workflows, "workflows");
         let credentialsSelection = parseTargetSelection(options.credentials, "credentials");
         const dataTableRaw = options.dataTables ?? options.datatables;
@@ -61,114 +52,46 @@ export function registerNRemoveCommand(program: Command): void {
           dataTablesSelection = dataTablesSelection ?? { mode: "all" };
         }
 
-        if (options.archivedWorkflows === true) {
-          const archivedWorkflowIds = await listArchivedWorkflowIds(targetClient);
-          if (!workflowsSelection || workflowsSelection.mode === "all") {
-            workflowsSelection = { mode: "ids", ids: archivedWorkflowIds };
-          } else {
-            const archivedSet = new Set(archivedWorkflowIds);
-            workflowsSelection = {
-              mode: "ids",
-              ids: workflowsSelection.ids.filter((id) => archivedSet.has(id)),
-            };
-          }
-        }
-
         if (!workflowsSelection && !credentialsSelection && !dataTablesSelection) {
-          throw new ValidationError(
-            "Nothing selected to remove. Use at least one of --workflows, --credentials, --data-tables, or --all.",
-          );
+          throw new ValidationError("Nothing selected to remove. Use --workflows/--credentials/--data-tables/--all.");
         }
 
-        spinner.text = "Resolving remove targets";
+        if (options.archivedWorkflows === true) {
+          const runtime = await resolveRuntimeConfig({ profile: options.profile });
+          const targetClient = new N8nClient(runtime.target.url, runtime.target.apiKey);
+          const archivedIds = (await targetClient.listWorkflowsSummary()).filter((w) => w.archived).map((w) => w.id);
+          workflowsSelection = { mode: "ids", ids: archivedIds };
+        }
 
-        const workflowIds = await resolveIds(targetClient, "workflows", workflowsSelection);
-        const credentialIds = await resolveIds(targetClient, "credentials", credentialsSelection);
-        const dataTableIds = await resolveIds(targetClient, "data-tables", dataTablesSelection);
-        const response = {
-          side: "target",
-          instance: runtime.target.url,
-          dry_run: options.dryRun === true,
-          archived_workflows_only: options.archivedWorkflows === true,
-          selected: {
-            workflows: workflowIds,
-            credentials: credentialIds,
-            datatables: dataTableIds,
-          },
-          removed: {
-            workflows: [] as string[],
-            credentials: [] as string[],
-            datatables: [] as string[],
-          },
-        };
+        const workflowIds = toIds(workflowsSelection);
+        const credentialIds = toIds(credentialsSelection);
+        const datatableIds = toIds(dataTablesSelection);
 
-        const totalTargets = workflowIds.length + credentialIds.length + dataTableIds.length;
+        const totalTargets = workflowIds.length + credentialIds.length + datatableIds.length;
         if (totalTargets === 0) {
           spinner.succeed("No resources matched the selection");
-          await writeResultFileIfRequested(options.output, response);
           return;
         }
 
         spinner.succeed("Remove targets resolved");
 
-        logger.warn("[NREMOVE] You are about to remove resources from the target instance:");
-        if (runtime.profileName) {
-          logger.warn(`[NREMOVE] profile=${runtime.profileName}`);
-        }
-        logger.warn(`[NREMOVE] workflows=${workflowIds.length} ids=${formatIdsForLog(workflowIds)}`);
-        logger.warn(
-          `[NREMOVE] credentials=${credentialIds.length} ids=${formatIdsForLog(credentialIds)}`,
-        );
-        logger.warn(`[NREMOVE] data_tables=${dataTableIds.length} ids=${formatIdsForLog(dataTableIds)}`);
-
-        if (options.dryRun === true) {
-          logger.success("[NREMOVE] Dry run enabled. No changes executed.");
-          await writeResultFileIfRequested(options.output, response);
-          return;
-        }
-
-        if (options.yes !== true) {
+        if (!options.yes && options.dryRun !== true) {
           await requireYesConfirmation();
-        } else {
-          logger.warn("[NREMOVE] --yes detected: skipping interactive confirmation");
         }
 
-        const execSpinner = ora(`Removing ${totalTargets} resources from target instance`).start();
+        const result = await api.removeResources({
+          workflows: workflowsSelection?.mode === "all" ? "all" : workflowIds,
+          credentials: credentialsSelection?.mode === "all" ? "all" : credentialIds,
+          datatables: dataTablesSelection?.mode === "all" ? "all" : datatableIds,
+          dryRun: options.dryRun === true,
+          confirm: options.yes === true || options.dryRun === true,
+          outputPath: options.output,
+        });
 
-        try {
-          for (const id of workflowIds) {
-            execSpinner.text = `Removing workflow ${id}`;
-            await targetClient.deleteWorkflow(id);
-            response.removed.workflows.push(id);
-            logger.success(`[NREMOVE] Removed workflow id=${id}`);
-          }
-
-          for (const id of credentialIds) {
-            execSpinner.text = `Removing credential ${id}`;
-            await targetClient.deleteCredential(id);
-            response.removed.credentials.push(id);
-            logger.success(`[NREMOVE] Removed credential id=${id}`);
-          }
-
-          for (const id of dataTableIds) {
-            execSpinner.text = `Removing data table ${id}`;
-            await targetClient.deleteDataTable(id);
-            response.removed.datatables.push(id);
-            logger.success(`[NREMOVE] Removed data table id=${id}`);
-          }
-
-          execSpinner.succeed(`Remove completed: removed ${totalTargets} resources`);
-          await writeResultFileIfRequested(options.output, response);
-        } catch (error) {
-          if (execSpinner.isSpinning) {
-            execSpinner.fail("Remove failed during execution");
-          }
-          throw error;
-        }
+        logger.success("[NREMOVE] Remove completed");
+        console.log(JSON.stringify(result, null, 2));
       } catch (error) {
-        if (spinner.isSpinning) {
-          spinner.fail("Remove failed");
-        }
+        if (spinner.isSpinning) spinner.fail("Remove failed");
         throw error;
       }
     });
@@ -176,78 +99,25 @@ export function registerNRemoveCommand(program: Command): void {
   logger.debug("Command remove registered");
 }
 
-async function listArchivedWorkflowIds(targetClient: N8nClient): Promise<string[]> {
-  const workflows = await targetClient.listWorkflowsSummary();
-  return workflows.filter((workflow) => workflow.archived).map((workflow) => workflow.id);
-}
-
-async function writeResultFileIfRequested(outputPath: string | undefined, data: unknown): Promise<void> {
-  if (!outputPath) {
-    return;
-  }
-  await writeJsonFile(outputPath, data);
-  logger.success(`[NREMOVE] Result JSON written to ${outputPath}`);
-}
-
 function parseTargetSelection(raw: string | undefined, flagName: string): TargetSelection | null {
-  if (raw === undefined) {
-    return null;
-  }
-
+  if (raw === undefined) return null;
   const normalized = raw.trim();
-  if (!normalized) {
-    throw new ValidationError(`Option --${flagName} cannot be empty`);
-  }
-
-  if (normalized.toLowerCase() === "all") {
-    return { mode: "all" };
-  }
-
+  if (!normalized) throw new ValidationError(`Option --${flagName} cannot be empty`);
+  if (normalized.toLowerCase() === "all") return { mode: "all" };
   const ids = [...new Set(normalized.split(",").map((id) => id.trim()).filter(Boolean))];
-  if (ids.length === 0) {
-    throw new ValidationError(
-      `Option --${flagName} must be 'all' or a comma-separated list of IDs`,
-    );
-  }
-
-  if (ids.some((id) => id.toLowerCase() === "all")) {
-    throw new ValidationError(`Option --${flagName} cannot mix IDs with 'all'`);
-  }
-
+  if (ids.length === 0) throw new ValidationError(`Option --${flagName} must be 'all' or comma-separated IDs`);
   return { mode: "ids", ids };
 }
 
-async function resolveIds(
-  targetClient: N8nClient,
-  target: "workflows" | "credentials" | "data-tables",
-  selection: TargetSelection | null,
-): Promise<string[]> {
-  if (!selection) {
-    return [];
-  }
-
-  if (selection.mode === "ids") {
-    return selection.ids;
-  }
-
-  if (target === "workflows") {
-    return targetClient.listWorkflowIds();
-  }
-
-  if (target === "credentials") {
-    return targetClient.listCredentialIds();
-  }
-
-  return targetClient.listDataTableIds();
+function toIds(selection: TargetSelection | null): string[] {
+  if (!selection || selection.mode === "all") return [];
+  return selection.ids;
 }
 
 async function requireYesConfirmation(): Promise<void> {
   if (!input.isTTY || !output.isTTY) {
-    throw new ValidationError(
-      "Interactive confirmation requires a TTY. Re-run with --yes to force execution.",
-    );
+    throw new ValidationError("Interactive confirmation requires a TTY. Re-run with --yes.");
   }
-
   const rl = createInterface({ input, output });
   try {
     const answer = await rl.question("Type 'yes' to confirm deletion: ");
@@ -257,15 +127,4 @@ async function requireYesConfirmation(): Promise<void> {
   } finally {
     rl.close();
   }
-}
-
-function formatIdsForLog(ids: string[]): string {
-  if (ids.length === 0) {
-    return "[]";
-  }
-  if (ids.length <= 10) {
-    return `[${ids.join(",")}]`;
-  }
-  const preview = ids.slice(0, 10).join(",");
-  return `[${preview},...(+${ids.length - 10} more)]`;
 }

@@ -1,17 +1,9 @@
 import ora from "ora";
-import path from "path";
 import { Command } from "commander";
-import { N8nClient, WorkflowSummaryItem } from "../services/N8nClient.js";
-import {
-  resolveProjectOrphansFilePath,
-  writeJsonFile,
-} from "../utils/file.js";
-import { logger } from "../utils/logger.js";
 import { ValidationError } from "../errors/index.js";
 import { readRequiredProjectMetadata } from "../utils/project.js";
-import { resolveRuntimeConfig } from "../utils/runtime.js";
-
-type Side = "source" | "target";
+import { logger } from "../utils/logger.js";
+import { buildApiFromRuntime } from "./apiFactory.js";
 
 interface OrphansCommandOptions {
   profile?: string;
@@ -22,12 +14,6 @@ interface OrphansCommandOptions {
   datatables?: boolean;
   all?: boolean;
   output?: string;
-}
-
-interface OrphansOutput {
-  workflows?: Array<{ id: string; name: string; url: string }>;
-  credentials?: Array<{ id: string; name: string; type: string }>;
-  datatables?: Array<{ id: string; name: string }>;
 }
 
 export function registerNOrphansCommand(program: Command): void {
@@ -47,111 +33,22 @@ export function registerNOrphansCommand(program: Command): void {
       const spinner = ora("Preparing orphan analysis").start();
       try {
         const { project, metadata } = await readRequiredProjectMetadata(projectArg);
-        const runtime = await resolveRuntimeConfig({
-          profile: options.profile,
-          projectMetadata: metadata,
-        });
         const side = parseSide(options.side);
-        const selected = resolveEntitySelection(options);
-
-        const client =
-          side === "source"
-            ? new N8nClient(runtime.source.url, runtime.source.apiKey)
-            : new N8nClient(runtime.target.url, runtime.target.apiKey);
-
-        const instanceUrl = side === "source" ? runtime.source.url : runtime.target.url;
-        logger.info(`[NORPHANS] project=${project} side=${side} instance=${instanceUrl}`);
-        if (runtime.profileName) {
-          logger.info(`[NORPHANS] profile=${runtime.profileName}`);
-        }
-
-        spinner.text = "Loading workflows and computing references";
-        const workflowSummaries = await client.listWorkflowsSummary();
-        const nonArchivedWorkflows = workflowSummaries.filter((workflow) => !workflow.archived);
-        const workflowDetails = await Promise.all(
-          nonArchivedWorkflows.map((workflow) => client.getWorkflowById(workflow.id)),
-        );
-
-        const referencedWorkflowIds = new Set<string>();
-        const referencedCredentialIds = new Set<string>();
-        const referencedDataTableIds = new Set<string>();
-
-        for (const workflow of workflowDetails) {
-          for (const node of workflow.nodes) {
-            if (node.credentials) {
-              for (const credential of Object.values(node.credentials)) {
-                const credentialId = extractReferenceId(credential?.id);
-                if (credentialId) {
-                  referencedCredentialIds.add(credentialId);
-                }
-              }
-            }
-
-            if (node.type === "n8n-nodes-base.executeWorkflow") {
-              const subWorkflowId = extractReferenceId(node.parameters?.workflowId);
-              if (subWorkflowId && subWorkflowId !== workflow.id) {
-                referencedWorkflowIds.add(subWorkflowId);
-              }
-            }
-
-            if (node.type === "n8n-nodes-base.dataTable") {
-              const dataTableId = extractReferenceId(
-                node.parameters?.dataTableId ?? node.parameters?.tableId,
-              );
-              if (dataTableId) {
-                referencedDataTableIds.add(dataTableId);
-              }
-            }
-          }
-
-          const settingsRecord =
-            workflow.settings &&
-            typeof workflow.settings === "object" &&
-            !Array.isArray(workflow.settings)
-              ? (workflow.settings as Record<string, unknown>)
-              : null;
-          const errorWorkflowId = extractReferenceId(settingsRecord?.errorWorkflow);
-          if (errorWorkflowId && errorWorkflowId !== workflow.id) {
-            referencedWorkflowIds.add(errorWorkflowId);
-          }
-        }
-
-        spinner.text = "Loading credentials and data tables";
-        const [credentialSummaries, dataTableSummaries] = await Promise.all([
-          client.listCredentialsSummary(),
-          client.listDataTablesSummary(),
-        ]);
-
-        const response: OrphansOutput = {};
-
-        if (selected.workflows) {
-          response.workflows = computeOrphanWorkflows(
-            nonArchivedWorkflows,
-            referencedWorkflowIds,
-            instanceUrl,
-          );
-        }
-
-        if (selected.credentials) {
-          response.credentials = credentialSummaries
-            .filter((credential) => !referencedCredentialIds.has(credential.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
-        }
-
-        if (selected.datatables) {
-          response.datatables = dataTableSummaries
-            .filter((table) => !referencedDataTableIds.has(table.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
-        }
-
+        const { api, profileName } = await buildApiFromRuntime({ profile: options.profile, projectMetadata: metadata });
+        const response = await api.findOrphans({
+          projectPath: project,
+          side,
+          workflows: options.workflows,
+          credentials: options.credentials,
+          datatables: options.dataTables === true || options.datatables === true,
+          all: options.all,
+          outputPath: options.output,
+        });
         spinner.succeed("Orphan analysis completed");
-        const outputPath = resolveOutputPath(options.output, project, side);
-        await writeResultFile(outputPath, response, "NORPHANS");
+        if (profileName) logger.info(`[NORPHANS] profile=${profileName}`);
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
-        if (spinner.isSpinning) {
-          spinner.fail("Orphan analysis failed");
-        }
+        if (spinner.isSpinning) spinner.fail("Orphan analysis failed");
         throw error;
       }
     });
@@ -159,107 +56,7 @@ export function registerNOrphansCommand(program: Command): void {
   logger.debug("Command orphans registered");
 }
 
-async function writeResultFile(
-  outputPath: string,
-  data: unknown,
-  prefix: string,
-): Promise<void> {
-  await writeJsonFile(outputPath, data);
-  logger.success(`[${prefix}] Result JSON written to ${outputPath}`);
-}
-
-function resolveOutputPath(
-  outputPath: string | undefined,
-  project: string,
-  side: Side,
-): string {
-  if (outputPath) {
-    return path.resolve(process.cwd(), outputPath);
-  }
-  return resolveProjectOrphansFilePath(project, side);
-}
-
-function parseSide(value: string | undefined): Side {
-  if (value === "source" || value === "target") {
-    return value;
-  }
+function parseSide(value: string | undefined): "source" | "target" {
+  if (value === "source" || value === "target") return value;
   throw new ValidationError("Option --side must be one of: source, target");
-}
-
-function resolveEntitySelection(options: OrphansCommandOptions): {
-  workflows: boolean;
-  credentials: boolean;
-  datatables: boolean;
-} {
-  const explicitSelection =
-    options.workflows === true ||
-    options.credentials === true ||
-    options.dataTables === true ||
-    options.datatables === true ||
-    options.all === true;
-
-  if (!explicitSelection) {
-    return {
-      workflows: true,
-      credentials: true,
-      datatables: true,
-    };
-  }
-
-  if (options.all === true) {
-    return {
-      workflows: true,
-      credentials: true,
-      datatables: true,
-    };
-  }
-
-  return {
-    workflows: options.workflows === true,
-    credentials: options.credentials === true,
-    datatables: options.dataTables === true || options.datatables === true,
-  };
-}
-
-function computeOrphanWorkflows(
-  workflows: WorkflowSummaryItem[],
-  referencedWorkflowIds: Set<string>,
-  instanceUrl: string,
-): Array<{ id: string; name: string; url: string }> {
-  return workflows
-    .filter((workflow) => !referencedWorkflowIds.has(workflow.id))
-    .map((workflow) => ({
-      id: workflow.id,
-      name: workflow.name,
-      url: buildWorkflowUrl(instanceUrl, workflow.id),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function extractReferenceId(reference: unknown): string | null {
-  if (typeof reference === "string" || typeof reference === "number") {
-    return String(reference);
-  }
-
-  if (!reference || typeof reference !== "object") {
-    return null;
-  }
-
-  const record = reference as Record<string, unknown>;
-  const directValue = record.value;
-  if (typeof directValue === "string" || typeof directValue === "number") {
-    return String(directValue);
-  }
-
-  const directId = record.id;
-  if (typeof directId === "string" || typeof directId === "number") {
-    return String(directId);
-  }
-
-  return null;
-}
-
-function buildWorkflowUrl(instanceUrl: string, workflowId: string): string {
-  const base = instanceUrl.endsWith("/") ? instanceUrl.slice(0, -1) : instanceUrl;
-  return `${base}/workflow/${encodeURIComponent(workflowId)}`;
 }

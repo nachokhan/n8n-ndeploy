@@ -1,17 +1,9 @@
 import ora from "ora";
-import path from "path";
 import { Command } from "commander";
-import { N8nClient } from "../services/N8nClient.js";
-import {
-  resolveProjectDanglingFilePath,
-  writeJsonFile,
-} from "../utils/file.js";
-import { logger } from "../utils/logger.js";
 import { ValidationError } from "../errors/index.js";
 import { readRequiredProjectMetadata } from "../utils/project.js";
-import { resolveRuntimeConfig } from "../utils/runtime.js";
-
-type Side = "source" | "target";
+import { logger } from "../utils/logger.js";
+import { buildApiFromRuntime } from "./apiFactory.js";
 
 interface DanglingCommandOptions {
   profile?: string;
@@ -22,43 +14,6 @@ interface DanglingCommandOptions {
   datatables?: boolean;
   all?: boolean;
   output?: string;
-}
-
-interface EntitySelection {
-  workflows: boolean;
-  credentials: boolean;
-  datatables: boolean;
-}
-
-interface DanglingReferenceItem {
-  node_name: string;
-  node_type: string;
-  field: string;
-  missing_id: string;
-}
-
-interface WorkflowDanglingRefs {
-  workflow: {
-    id: string;
-    name: string;
-    url: string;
-  };
-  dangling_references: {
-    workflows?: DanglingReferenceItem[];
-    credentials?: DanglingReferenceItem[];
-    datatables?: DanglingReferenceItem[];
-  };
-}
-
-interface DanglingOutput {
-  summary: {
-    side: Side;
-    instance: string;
-    scanned_workflows: number;
-    workflows_with_issues: number;
-    dangling_references_total: number;
-  };
-  workflows: WorkflowDanglingRefs[];
 }
 
 export function registerNDanglingRefsCommand(program: Command): void {
@@ -79,162 +34,22 @@ export function registerNDanglingRefsCommand(program: Command): void {
       const spinner = ora("Preparing dangling reference analysis").start();
       try {
         const { project, metadata } = await readRequiredProjectMetadata(projectArg);
-        const runtime = await resolveRuntimeConfig({
-          profile: options.profile,
-          projectMetadata: metadata,
-        });
         const side = parseSide(options.side);
-        const selected = resolveEntitySelection(options);
-
-        const client =
-          side === "source"
-            ? new N8nClient(runtime.source.url, runtime.source.apiKey)
-            : new N8nClient(runtime.target.url, runtime.target.apiKey);
-
-        const instanceUrl = side === "source" ? runtime.source.url : runtime.target.url;
-        logger.info(`[NDANGLING] project=${project} side=${side} instance=${instanceUrl}`);
-        if (runtime.profileName) {
-          logger.info(`[NDANGLING] profile=${runtime.profileName}`);
-        }
-
-        spinner.text = "Loading entity inventories";
-        const [workflowSummaries, credentialSummaries, dataTableSummaries] = await Promise.all([
-          client.listWorkflowsSummary(),
-          client.listCredentialsSummary(),
-          client.listDataTablesSummary(),
-        ]);
-
-        const nonArchivedWorkflows = workflowSummaries.filter((workflow) => !workflow.archived);
-        const existingWorkflowIds = new Set(nonArchivedWorkflows.map((workflow) => workflow.id));
-        const existingCredentialIds = new Set(credentialSummaries.map((credential) => credential.id));
-        const existingDataTableIds = new Set(dataTableSummaries.map((table) => table.id));
-
-        spinner.text = "Analyzing workflow references";
-        const workflowDetails = await Promise.all(
-          nonArchivedWorkflows.map((workflow) => client.getWorkflowById(workflow.id)),
-        );
-
-        const result: WorkflowDanglingRefs[] = [];
-        let totalDangling = 0;
-
-        for (const workflow of workflowDetails) {
-          const missingWorkflows: DanglingReferenceItem[] = [];
-          const missingCredentials: DanglingReferenceItem[] = [];
-          const missingDataTables: DanglingReferenceItem[] = [];
-
-          for (const node of workflow.nodes) {
-            if (selected.workflows && node.type === "n8n-nodes-base.executeWorkflow") {
-              const subWorkflowId = extractReferenceId(node.parameters?.workflowId);
-              if (subWorkflowId && !existingWorkflowIds.has(subWorkflowId)) {
-                missingWorkflows.push({
-                  node_name: node.name,
-                  node_type: node.type,
-                  field: "parameters.workflowId",
-                  missing_id: subWorkflowId,
-                });
-              }
-            }
-
-            if (selected.credentials && node.credentials) {
-              for (const [credentialKey, credentialValue] of Object.entries(node.credentials)) {
-                const credentialId = extractReferenceId(credentialValue?.id);
-                if (credentialId && !existingCredentialIds.has(credentialId)) {
-                  missingCredentials.push({
-                    node_name: node.name,
-                    node_type: node.type,
-                    field: `credentials.${credentialKey}.id`,
-                    missing_id: credentialId,
-                  });
-                }
-              }
-            }
-
-            if (selected.datatables && node.type === "n8n-nodes-base.dataTable") {
-              const dataTableId = extractReferenceId(
-                node.parameters?.dataTableId ?? node.parameters?.tableId,
-              );
-              if (dataTableId && !existingDataTableIds.has(dataTableId)) {
-                const fieldName = node.parameters?.dataTableId !== undefined
-                  ? "parameters.dataTableId"
-                  : "parameters.tableId";
-                missingDataTables.push({
-                  node_name: node.name,
-                  node_type: node.type,
-                  field: fieldName,
-                  missing_id: dataTableId,
-                });
-              }
-            }
-          }
-
-          if (selected.workflows) {
-            const settingsRecord =
-              workflow.settings &&
-              typeof workflow.settings === "object" &&
-              !Array.isArray(workflow.settings)
-                ? (workflow.settings as Record<string, unknown>)
-                : null;
-            const errorWorkflowId = extractReferenceId(settingsRecord?.errorWorkflow);
-            if (errorWorkflowId && !existingWorkflowIds.has(errorWorkflowId)) {
-              missingWorkflows.push({
-                node_name: "[workflow-settings]",
-                node_type: "workflow.settings",
-                field: "settings.errorWorkflow",
-                missing_id: errorWorkflowId,
-              });
-            }
-          }
-
-          const workflowIssueCount =
-            missingWorkflows.length + missingCredentials.length + missingDataTables.length;
-          if (workflowIssueCount === 0) {
-            continue;
-          }
-
-          totalDangling += workflowIssueCount;
-
-          const danglingReferences: WorkflowDanglingRefs["dangling_references"] = {};
-          if (selected.workflows) {
-            danglingReferences.workflows = missingWorkflows;
-          }
-          if (selected.credentials) {
-            danglingReferences.credentials = missingCredentials;
-          }
-          if (selected.datatables) {
-            danglingReferences.datatables = missingDataTables;
-          }
-
-          result.push({
-            workflow: {
-              id: workflow.id,
-              name: workflow.name,
-              url: buildWorkflowUrl(instanceUrl, workflow.id),
-            },
-            dangling_references: danglingReferences,
-          });
-        }
-
-        result.sort((a, b) => a.workflow.name.localeCompare(b.workflow.name));
-
-        const response: DanglingOutput = {
-          summary: {
-            side,
-            instance: instanceUrl,
-            scanned_workflows: nonArchivedWorkflows.length,
-            workflows_with_issues: result.length,
-            dangling_references_total: totalDangling,
-          },
-          workflows: result,
-        };
-
+        const { api, profileName } = await buildApiFromRuntime({ profile: options.profile, projectMetadata: metadata });
+        const response = await api.findDanglingReferences({
+          projectPath: project,
+          side,
+          workflows: options.workflows,
+          credentials: options.credentials,
+          datatables: options.dataTables === true || options.datatables === true,
+          all: options.all,
+          outputPath: options.output,
+        });
         spinner.succeed("Dangling reference analysis completed");
-        const outputPath = resolveOutputPath(options.output, project, side);
-        await writeResultFile(outputPath, response, "NDANGLING");
+        if (profileName) logger.info(`[NDANGLING] profile=${profileName}`);
         console.log(JSON.stringify(response, null, 2));
       } catch (error) {
-        if (spinner.isSpinning) {
-          spinner.fail("Dangling reference analysis failed");
-        }
+        if (spinner.isSpinning) spinner.fail("Dangling reference analysis failed");
         throw error;
       }
     });
@@ -242,80 +57,7 @@ export function registerNDanglingRefsCommand(program: Command): void {
   logger.debug("Command dangling-refs registered");
 }
 
-async function writeResultFile(
-  outputPath: string,
-  data: unknown,
-  prefix: string,
-): Promise<void> {
-  await writeJsonFile(outputPath, data);
-  logger.success(`[${prefix}] Result JSON written to ${outputPath}`);
-}
-
-function resolveOutputPath(
-  outputPath: string | undefined,
-  project: string,
-  side: Side,
-): string {
-  if (outputPath) {
-    return path.resolve(process.cwd(), outputPath);
-  }
-  return resolveProjectDanglingFilePath(project, side);
-}
-
-function parseSide(value: string | undefined): Side {
-  if (value === "source" || value === "target") {
-    return value;
-  }
+function parseSide(value: string | undefined): "source" | "target" {
+  if (value === "source" || value === "target") return value;
   throw new ValidationError("Option --side must be one of: source, target");
-}
-
-function resolveEntitySelection(options: DanglingCommandOptions): EntitySelection {
-  const explicitSelection =
-    options.workflows === true ||
-    options.credentials === true ||
-    options.dataTables === true ||
-    options.datatables === true ||
-    options.all === true;
-
-  if (!explicitSelection || options.all === true) {
-    return {
-      workflows: true,
-      credentials: true,
-      datatables: true,
-    };
-  }
-
-  return {
-    workflows: options.workflows === true,
-    credentials: options.credentials === true,
-    datatables: options.dataTables === true || options.datatables === true,
-  };
-}
-
-function extractReferenceId(reference: unknown): string | null {
-  if (typeof reference === "string" || typeof reference === "number") {
-    return String(reference);
-  }
-
-  if (!reference || typeof reference !== "object") {
-    return null;
-  }
-
-  const record = reference as Record<string, unknown>;
-  const directValue = record.value;
-  if (typeof directValue === "string" || typeof directValue === "number") {
-    return String(directValue);
-  }
-
-  const directId = record.id;
-  if (typeof directId === "string" || typeof directId === "number") {
-    return String(directId);
-  }
-
-  return null;
-}
-
-function buildWorkflowUrl(instanceUrl: string, workflowId: string): string {
-  const base = instanceUrl.endsWith("/") ? instanceUrl.slice(0, -1) : instanceUrl;
-  return `${base}/workflow/${encodeURIComponent(workflowId)}`;
 }

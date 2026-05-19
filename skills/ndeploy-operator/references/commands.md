@@ -122,6 +122,14 @@ ndeploy credentials validate <project> --side manifest
 
 Checks manifest entries for missing required fields.
 
+For `httpHeaderAuth`, `name` and `value` must be present. Empty `template.data` is not usable credential data.
+
+Extra non-secret check for all credential CREATE actions:
+
+```bash
+node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('<project>/plan.json','utf8')); const m=JSON.parse(fs.readFileSync('<project>/credentials_manifest.json','utf8')); const byId=new Map(m.credentials.map(c=>[c.source_id,c])); console.table(p.actions.filter(a=>a.type==='CREDENTIAL'&&a.action==='CREATE').map(a=>{const c=byId.get(a.source_id); const data=c?.template?.data||{}; return {name:a.name,type:a.payload?.type,hasData:Object.keys(data).some(k=>String(data[k]||'').trim()),hasHeaderName:Object.hasOwn(data,'name'),hasHeaderValue:Object.hasOwn(data,'value'),dataKeys:Object.keys(data).join(',')}}));"
+```
+
 Use `--strict` only when the repository's validator/schema is known to represent all runtime requirements accurately.
 
 ## Credential Action Table
@@ -146,6 +154,8 @@ ndeploy apply <project>
 Requires explicit user confirmation. Mutates target by creating/updating credentials, data tables, and workflows according to `plan.json`.
 
 If the plan includes credential `CREATE`, apply requires `credentials_manifest.json`.
+
+Before apply, reject any credential `CREATE` where manifest data is `{}` or where an `httpHeaderAuth` lacks `name` or `value`.
 
 Writes:
 
@@ -175,3 +185,22 @@ ndeploy dangling <project> --side target
 ```
 
 Use before cleanup or when investigating unexplained references.
+
+## Recover Empty Created Credential
+
+If a previous apply created an empty credential:
+
+1. Confirm the target credential is empty with `credentials fetch --side target` and non-secret data key checks.
+2. Delete only that credential from target, with explicit user confirmation.
+3. Re-run:
+
+```bash
+npm run start -- plan <project>
+npm run start -- credentials fetch <project> --side both
+npm run start -- credentials merge-missing <project> --side source
+npm run start -- credentials validate <project> --side manifest
+npm run start -- apply <project>
+npm run start -- credentials fetch <project> --side target
+```
+
+4. Verify the recreated credential has data keys, without printing values.

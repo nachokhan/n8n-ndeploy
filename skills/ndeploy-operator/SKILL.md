@@ -133,6 +133,14 @@ npm run start -- credentials validate <project> --side manifest
 
 If no credential has action `CREATE`, the manifest is not required for apply.
 
+For each credential with action `CREATE`, also verify that the manifest has non-empty `template.data` without printing secrets:
+
+```bash
+node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('<project>/plan.json','utf8')); const m=JSON.parse(fs.readFileSync('<project>/credentials_manifest.json','utf8')); const byId=new Map(m.credentials.map(c=>[c.source_id,c])); console.table(p.actions.filter(a=>a.type==='CREDENTIAL'&&a.action==='CREATE').map(a=>{const c=byId.get(a.source_id); return {name:a.name,type:a.payload?.type,hasData:!!c&&Object.keys(c.template?.data||{}).some(k=>String(c.template.data[k]||'').trim()),dataKeys:Object.keys(c?.template?.data||{}).join(',')}}));"
+```
+
+For `httpHeaderAuth`, require both `name` and `value`. If either is missing, stop. Do not apply.
+
 Read [references/commands.md](references/commands.md) for output interpretation and command details when needed.
 
 ## Credential Semantics
@@ -143,6 +151,7 @@ Do not confuse `credentials compare` with deployment behavior.
 - `CREATE`: target credential is missing and apply must create it using `credentials_manifest.json`.
 - `different` in `credentials compare`: source and target data differ. This is often expected for OAuth, Google, Redis, and environment-specific secrets.
 - `missing_in_target`: target credential does not exist for that source dependency. If the plan says `CREATE`, manifest data must be ready.
+- Empty object data (`{}`) is not valid credential data. Treat it as missing, even if a note says data was filled.
 
 For environment-specific credentials, differences are not automatically bad. Be critical:
 
@@ -162,6 +171,12 @@ node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('<project>/c
 
 If `hasData` is false for a `CREATE` credential, stop and explain that apply may create an unusable credential.
 
+For `httpHeaderAuth`, check for `name` and `value` specifically:
+
+```bash
+node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('<project>/credentials_manifest.json','utf8')); console.table(m.credentials.filter(c=>c.type==='httpHeaderAuth').map(c=>({name:c.name,hasName:Object.hasOwn(c.template?.data||{},'name'),hasValue:Object.hasOwn(c.template?.data||{},'value'),dataKeys:Object.keys(c.template?.data||{}).join(',')})));"
+```
+
 ## Apply Gate
 
 Before asking to run apply, present:
@@ -173,6 +188,7 @@ Before asking to run apply, present:
 - Workflow actions: `CREATE`, `UPDATE`, skipped/equal if known.
 - Any warnings from validation, compare, plan, or recent failed executions.
 - Confirmation that `credentials_manifest.json` exists and validates if credential creation is required.
+- Confirmation that each credential `CREATE` has non-empty manifest data. For `httpHeaderAuth`, confirm `name` and `value` exist without printing values.
 
 Ask a direct confirmation question. Example:
 
@@ -193,6 +209,14 @@ npm run start -- info <project>
 ```
 
 and inspect `reports/deploy_summary.json`.
+
+After apply, if a credential was created, refresh target credentials and verify the created credential has non-empty data keys:
+
+```bash
+npm run start -- credentials fetch <project> --side target
+```
+
+If target shows the newly created credential with no data keys, do not call it successful. Explain that target has an unusable credential and recover through a controlled delete/recreate flow, not by manually editing secrets in chat.
 
 ## Publish Gate
 

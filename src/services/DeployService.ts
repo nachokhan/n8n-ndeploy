@@ -315,7 +315,13 @@ export class DeployService {
       });
     }
 
-    const missingRequiredFields = manifestEntry.template.required_fields.filter((field) =>
+    const requiredFields = [
+      ...new Set([
+        ...manifestEntry.template.required_fields,
+        ...this.getCredentialTypeRequiredDataFields(payload.type),
+      ]),
+    ];
+    const missingRequiredFields = requiredFields.filter((field) =>
       this.isMissingManifestValue(manifestEntry.template.data[field]),
     );
     if (missingRequiredFields.length > 0) {
@@ -328,6 +334,14 @@ export class DeployService {
     }
 
     const dataKeys = Object.keys(manifestEntry.template.data);
+    if (!this.hasManifestData(manifestEntry.template.data)) {
+      throw new ValidationError("Credential manifest entry has no data for credential CREATE action", {
+        source_id: action.source_id,
+        name: payload.name,
+        type: payload.type,
+      });
+    }
+
     logger.debug(
       `[DEPLOY][RUN][CREDENTIAL] CREATE from manifest name="${payload.name}" type="${payload.type}" data_keys=${dataKeys.length}`,
     );
@@ -721,5 +735,16 @@ export class DeployService {
     }
 
     return false;
+  }
+
+  private hasManifestData(data: Record<string, unknown>): boolean {
+    return Object.keys(data).some((key) => !this.isMissingManifestValue(data[key]));
+  }
+
+  private getCredentialTypeRequiredDataFields(type: string): string[] {
+    if (type === "httpHeaderAuth") {
+      return ["name", "value"];
+    }
+    return [];
   }
 }

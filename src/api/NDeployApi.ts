@@ -51,7 +51,7 @@ import {
   RemoveResourcesInput,
   ValidateCredentialsInput,
 } from "./types.js";
-import { CredentialSnapshotEntry, CredentialSnapshotFile, CredentialsManifestFile } from "../types/credentials.js";
+import { CredentialSnapshotEntry, CredentialSnapshotFile, CredentialsManifestEntry, CredentialsManifestFile } from "../types/credentials.js";
 
 interface FillLookupCandidate {
   result_id: string;
@@ -391,7 +391,21 @@ export class NDeployApi {
     let added = 0;
     let skippedExisting = 0;
     for (const item of this.buildSnapshotMergeOrder(mergeSide, sourceSnapshot, targetSnapshot)) {
-      if (bySourceId.has(item.source_id)) {
+      const existing = bySourceId.get(item.source_id);
+      if (existing) {
+        if (!this.templateHasData(existing.template.data) && this.templateHasData(item.template.data)) {
+          bySourceId.set(item.source_id, {
+            ...existing,
+            updated_at: new Date().toISOString(),
+            seeded_from: this.resolveSeededFrom(mergeSide, item),
+            template: {
+              ...item.template,
+              fields: [...item.template.fields],
+              required_fields: [...item.template.required_fields],
+              data: { ...item.template.data },
+            },
+          });
+        }
         skippedExisting += 1;
         continue;
       }
@@ -402,7 +416,7 @@ export class NDeployApi {
         type: item.type,
         created_at: now,
         updated_at: now,
-        seeded_from: mergeSide,
+        seeded_from: this.resolveSeededFrom(mergeSide, item),
         template: item.template,
       });
       added += 1;
@@ -655,7 +669,7 @@ export class NDeployApi {
 
   private async readCredentialsManifestForApply(
     projectPath: string,
-    actions: Array<{ type: string; action: string }>,
+    actions: Array<{ type: string; action: string; source_id: string; name: string }>,
   ) {
     const requiresCredentialCreation = actions.some((action) => action.type === "CREDENTIAL" && action.action === "CREATE");
     if (!requiresCredentialCreation) return null;
@@ -667,7 +681,44 @@ export class NDeployApi {
     if (!manifest.metadata || !Array.isArray(manifest.credentials)) {
       throw new ValidationError(`Invalid credentials manifest format in ${manifestPath}.`);
     }
-    return new Map(manifest.credentials.map((c) => [c.source_id, c]));
+
+    const bySourceId = new Map(manifest.credentials.map((c) => [c.source_id, c]));
+    const sourceSnapshot = await this.readSnapshotForSideIfExists(projectPath, "source");
+    const sourceById = new Map((sourceSnapshot?.credentials ?? []).map((credential) => [credential.source_id, credential]));
+
+    for (const action of actions.filter((item) => item.type === "CREDENTIAL" && item.action === "CREATE")) {
+      const manifestEntry = bySourceId.get(action.source_id);
+      if (!manifestEntry) {
+        continue;
+      }
+
+      if (this.templateHasData(manifestEntry.template.data)) {
+        continue;
+      }
+
+      const sourceEntry = sourceById.get(action.source_id);
+      if (!sourceEntry || !this.templateHasData(sourceEntry.template.data)) {
+        continue;
+      }
+
+      bySourceId.set(action.source_id, {
+        ...manifestEntry,
+        updated_at: new Date().toISOString(),
+        seeded_from: "source",
+        template: {
+          ...sourceEntry.template,
+          fields: [...sourceEntry.template.fields],
+          required_fields: [...sourceEntry.template.required_fields],
+          data: { ...sourceEntry.template.data },
+        },
+      });
+      await this.emit("info", "Credential CREATE manifest entry filled from source snapshot", {
+        source_id: action.source_id,
+        name: action.name,
+      });
+    }
+
+    return bySourceId;
   }
 
   private async discoverCredentialDependencies(rootWorkflowId: string): Promise<Array<{ source_id: string; name: string; type: string }>> {
@@ -789,7 +840,7 @@ export class NDeployApi {
       required_fields: requiredFields,
       fields: requiredFields.map((f) => ({ name: f, type: null, required: true })),
       data: fillData ?? {},
-      note: fillData
+      note: fillData && this.templateHasData(fillData)
         ? `Filled with data available from the ${side} API/export endpoint.`
         : `No fill data available from ${side} side.`,
     };
@@ -805,7 +856,7 @@ export class NDeployApi {
 
     for (const candidate of candidates) {
       const apiData = await client.getCredentialDataForFill(candidate.request_id);
-      if (apiData) {
+      if (apiData && this.templateHasData(apiData)) {
         result.set(candidate.result_id, apiData);
       }
     }
@@ -908,7 +959,7 @@ export class NDeployApi {
       }
       const credentialId = String(idValue);
       const data = this.extractCredentialData(record);
-      if (data) {
+      if (data && this.templateHasData(data)) {
         result.set(credentialId, data);
       }
     }
@@ -967,6 +1018,18 @@ export class NDeployApi {
     return file;
   }
 
+  private async readSnapshotForSideIfExists(projectPath: string, side: "source" | "target"): Promise<CredentialSnapshotFile | null> {
+    const filePath = side === "source" ? resolveProjectCredentialsSourceFilePath(projectPath) : resolveProjectCredentialsTargetFilePath(projectPath);
+    if (!(await fileExists(filePath))) {
+      return null;
+    }
+    const file = await readJsonFile<CredentialSnapshotFile>(filePath);
+    if (!file.metadata || !Array.isArray(file.credentials)) {
+      throw new ValidationError(`Invalid credentials snapshot format in ${filePath}.`);
+    }
+    return file;
+  }
+
   private async readManifest(projectPath: string): Promise<CredentialsManifestFile> {
     const manifestPath = resolveProjectCredentialsManifestFilePath(projectPath);
     if (!(await fileExists(manifestPath))) {
@@ -1007,7 +1070,29 @@ export class NDeployApi {
     const sourceById = new Map((sourceSnapshot?.credentials ?? []).map((i) => [i.source_id, i]));
     const targetById = new Map((targetSnapshot?.credentials ?? []).map((i) => [i.source_id, i]));
     const ids = [...new Set([...(targetSnapshot?.credentials ?? []).map((i) => i.source_id), ...(sourceSnapshot?.credentials ?? []).map((i) => i.source_id)])].sort();
-    return ids.map((id) => targetById.get(id) ?? sourceById.get(id)).filter((i): i is CredentialSnapshotEntry => Boolean(i));
+    return ids
+      .map((id) => {
+        const target = targetById.get(id);
+        const source = sourceById.get(id);
+        if (target && target.matched_by !== "unmatched" && this.templateHasData(target.template.data)) {
+          return target;
+        }
+        return source ?? target;
+      })
+      .filter((i): i is CredentialSnapshotEntry => Boolean(i));
+  }
+
+  private resolveSeededFrom(
+    mergeSide: "source" | "target" | "both",
+    snapshot: CredentialSnapshotEntry,
+  ): CredentialsManifestEntry["seeded_from"] {
+    if (mergeSide === "source") return "source";
+    if (mergeSide === "target") return "target";
+    return snapshot.matched_by === "name" ? "target" : "source";
+  }
+
+  private templateHasData(data: Record<string, unknown>): boolean {
+    return Object.keys(data).some((key) => !this.isMissing(data[key]));
   }
 
   private validateSnapshot(snapshot: CredentialSnapshotFile) {
@@ -1018,7 +1103,7 @@ export class NDeployApi {
         source_id: credential.source_id,
         name: credential.name,
         type: credential.type,
-        missing: credential.template.required_fields.filter((f) => this.isMissing(credential.template.data[f])),
+        missing: this.getCredentialRequiredDataFields(credential.type).filter((f) => this.isMissing(credential.template.data[f])),
       })),
     };
   }
@@ -1031,9 +1116,14 @@ export class NDeployApi {
         source_id: credential.source_id,
         name: credential.name,
         type: credential.type,
-        missing: credential.template.required_fields.filter((f) => this.isMissing(credential.template.data[f])),
+        missing: this.getCredentialRequiredDataFields(credential.type, credential.template.required_fields).filter((f) => this.isMissing(credential.template.data[f])),
       })),
     };
+  }
+
+  private getCredentialRequiredDataFields(type: string | null, schemaRequiredFields: string[] = []): string[] {
+    const byType = type === "httpHeaderAuth" ? ["name", "value"] : [];
+    return [...new Set([...schemaRequiredFields, ...byType])];
   }
 
   private isMissing(value: unknown): boolean {

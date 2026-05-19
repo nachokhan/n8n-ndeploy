@@ -5,3 +5,4 @@ dist
 plan_*.json
 tmp/
 projects/
+.DS_Store

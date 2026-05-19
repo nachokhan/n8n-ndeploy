@@ -1,4 +1,5 @@
 import path from "node:path";
+import axios from "axios";
 import { N8nClient } from "../services/N8nClient.js";
 import { PlanService } from "../services/PlanService.js";
 import { PlanSummaryService } from "../services/PlanSummaryService.js";
@@ -45,11 +46,19 @@ import {
   MergeMissingCredentialsInput,
   MergeMissingCredentialsResult,
   NDeployApiConfig,
+  NDeployEndpointConfig,
   PublishWorkflowInput,
   RemoveResourcesInput,
   ValidateCredentialsInput,
 } from "./types.js";
 import { CredentialSnapshotEntry, CredentialSnapshotFile, CredentialsManifestFile } from "../types/credentials.js";
+
+interface FillLookupCandidate {
+  result_id: string;
+  request_id: string;
+  name: string;
+  type: string | null;
+}
 
 export class NDeployApi {
   private readonly sourceClient: N8nClient;
@@ -694,11 +703,47 @@ export class NDeployApi {
     projectPath: string,
   ): Promise<CredentialSnapshotFile> {
     const entries: CredentialSnapshotEntry[] = [];
+    const matchedBySourceId = new Map<
+      string,
+      { id: string | null; name: string | null; type: string | null; matched_by: "id" | "name" | "unmatched"; resolution: "resolved" | "missing" }
+    >();
+    const fillCandidates: FillLookupCandidate[] = [];
+
     for (const d of deps) {
       const matched = side === "source"
         ? { id: d.source_id, name: d.name, type: d.type, matched_by: "id" as const, resolution: "resolved" as const }
         : await this.resolveTargetCredential(d);
-      const template = await this.buildCredentialTemplate(d, matched.id, side);
+      matchedBySourceId.set(d.source_id, matched);
+      if (matched.id) {
+        fillCandidates.push({
+          result_id: d.source_id,
+          request_id: matched.id,
+          name: matched.name ?? d.name,
+          type: matched.type ?? d.type,
+        });
+      }
+    }
+
+    const fillDataBySourceId = await this.resolveFillDataViaSide(
+      side === "source" ? this.sourceClient : this.targetClient,
+      side === "source" ? this.config.source : this.config.target,
+      fillCandidates,
+      side,
+    );
+
+    for (const d of deps) {
+      const matched = matchedBySourceId.get(d.source_id);
+      if (!matched) {
+        throw new ValidationError("Credential match missing after snapshot resolution", {
+          source_id: d.source_id,
+          side,
+        });
+      }
+      const template = await this.buildCredentialTemplate(
+        d,
+        fillDataBySourceId.get(d.source_id) ?? null,
+        side,
+      );
       entries.push({
         source_id: d.source_id,
         snapshot_id: matched.id,
@@ -733,22 +778,181 @@ export class NDeployApi {
 
   private async buildCredentialTemplate(
     d: { source_id: string; type: string },
-    snapshotId: string | null,
+    fillData: Record<string, unknown> | null,
     side: "source" | "target",
   ) {
     const requiredFields = await this.sourceClient.getCredentialTemplate(d.type)
       .then((t) => t.requiredFields)
       .catch(() => []);
-    const fillData = snapshotId
-      ? await (side === "source" ? this.sourceClient.getCredentialDataForFill(snapshotId) : this.targetClient.getCredentialDataForFill(snapshotId))
-      : null;
     return {
       source: "schema" as const,
       required_fields: requiredFields,
       fields: requiredFields.map((f) => ({ name: f, type: null, required: true })),
       data: fillData ?? {},
-      note: fillData ? null : `No fill data available from ${side} side.`,
+      note: fillData
+        ? `Filled with data available from the ${side} API/export endpoint.`
+        : `No fill data available from ${side} side.`,
     };
+  }
+
+  private async resolveFillDataViaSide(
+    client: N8nClient,
+    endpointConfig: NDeployEndpointConfig,
+    candidates: FillLookupCandidate[],
+    side: "source" | "target",
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const result = new Map<string, Record<string, unknown>>();
+
+    for (const candidate of candidates) {
+      const apiData = await client.getCredentialDataForFill(candidate.request_id);
+      if (apiData) {
+        result.set(candidate.result_id, apiData);
+      }
+    }
+
+    const unresolved = candidates.filter((candidate) => !result.has(candidate.result_id));
+    if (unresolved.length === 0) {
+      await this.emit("info", "Credential fill resolved from API", {
+        side,
+        resolved: result.size,
+        unresolved: 0,
+      });
+      return result;
+    }
+
+    if (!endpointConfig.credentialExportUrl || !endpointConfig.credentialExportToken) {
+      await this.emit("info", "Credential export endpoint fallback disabled", {
+        side,
+        resolved: result.size,
+        unresolved: unresolved.length,
+      });
+      return result;
+    }
+
+    const endpointMap = await this.fetchFillDataFromExportEndpoint(
+      endpointConfig.credentialExportUrl,
+      endpointConfig.credentialExportToken,
+      unresolved,
+    );
+    for (const [credentialId, data] of endpointMap.entries()) {
+      if (!result.has(credentialId)) {
+        result.set(credentialId, data);
+      }
+    }
+
+    await this.emit("info", "Credential fill resolved from API/export endpoint", {
+      side,
+      resolved: result.size,
+      unresolved: candidates.filter((candidate) => !result.has(candidate.result_id)).length,
+    });
+    return result;
+  }
+
+  private async fetchFillDataFromExportEndpoint(
+    endpointUrl: string,
+    endpointToken: string,
+    credentials: FillLookupCandidate[],
+  ): Promise<Map<string, Record<string, unknown>>> {
+    try {
+      const response = await axios.post(
+        endpointUrl,
+        {
+          credentials: credentials.map((credential) => ({
+            source_id: credential.request_id,
+            id: credential.request_id,
+            name: credential.name,
+            type: credential.type,
+          })),
+        },
+        {
+          timeout: 20000,
+          headers: {
+            Authorization: `Bearer ${endpointToken}`,
+            "X-NDEPLOY-TOKEN": endpointToken,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      const rawMap = this.parseExportEndpointResponse(response.data);
+      const result = new Map<string, Record<string, unknown>>();
+      const resultIdByRequestId = new Map(
+        credentials.map((credential) => [credential.request_id, credential.result_id] as const),
+      );
+      for (const [requestId, data] of rawMap.entries()) {
+        const resultId = resultIdByRequestId.get(requestId);
+        if (resultId) {
+          result.set(resultId, data);
+        }
+      }
+      return result;
+    } catch (error) {
+      await this.emit("warn", "Credential export endpoint unavailable", {
+        status: axios.isAxiosError(error) ? error.response?.status ?? null : null,
+      });
+      return new Map<string, Record<string, unknown>>();
+    }
+  }
+
+  private parseExportEndpointResponse(payload: unknown): Map<string, Record<string, unknown>> {
+    const items = this.extractCredentialItems(payload);
+    const result = new Map<string, Record<string, unknown>>();
+
+    for (const item of items) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+      const record = item as Record<string, unknown>;
+      const idValue = record.source_id ?? record.dev_id ?? record.id;
+      if (typeof idValue !== "string" && typeof idValue !== "number") {
+        continue;
+      }
+      const credentialId = String(idValue);
+      const data = this.extractCredentialData(record);
+      if (data) {
+        result.set(credentialId, data);
+      }
+    }
+
+    return result;
+  }
+
+  private extractCredentialItems(payload: unknown): unknown[] {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+    if (!payload || typeof payload !== "object") {
+      return [];
+    }
+
+    const root = payload as Record<string, unknown>;
+    for (const key of ["credentials", "items", "results", "data"]) {
+      const value = root[key];
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+
+    const nestedData = root.data;
+    if (nestedData && typeof nestedData === "object" && !Array.isArray(nestedData)) {
+      const nested = nestedData as Record<string, unknown>;
+      for (const key of ["credentials", "items", "results"]) {
+        const value = nested[key];
+        if (Array.isArray(value)) {
+          return value;
+        }
+      }
+    }
+
+    return [];
+  }
+
+  private extractCredentialData(record: Record<string, unknown>): Record<string, unknown> | null {
+    for (const candidate of [record.data, record.credential_data, record.values]) {
+      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+        return candidate as Record<string, unknown>;
+      }
+    }
+    return null;
   }
 
   private async readSnapshotForSide(projectPath: string, side: "source" | "target"): Promise<CredentialSnapshotFile> {

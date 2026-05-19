@@ -1,0 +1,4 @@
+interface:
+  display_name: "ndeploy Operator"
+  short_description: "Operate n8n ndeploy projects safely from Codex."
+  default_prompt: "Inspect this ndeploy project, summarize status, validate credentials, and prepare a safe deployment plan without applying changes unless I explicitly confirm."
